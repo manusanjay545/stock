@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Zap, Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -10,11 +12,52 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const router = useRouter();
+  const supabase = createClient();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => { window.location.href = "/dashboard"; }, 800);
+    setError("");
+    setMessage("");
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+          display_name: name,
+        },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      setMessage("Check your email for a confirmation link to activate your account.");
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
+    });
+    if (error) setError(error.message);
   };
 
   return (
@@ -30,6 +73,20 @@ export default function SignupPage() {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">Create Account</h1>
           <p className="text-sm text-muted-foreground mt-2">Start your AI-powered trading analysis journey</p>
         </div>
+
+        {/* Error / Success Messages */}
+        {error && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <AlertCircle size={16} className="shrink-0" />
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+            <CheckCircle size={16} className="shrink-0 mt-0.5" />
+            <span>{message}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSignup} className="glass-card p-8 space-y-5">
           <div>
@@ -58,6 +115,7 @@ export default function SignupPage() {
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            <p className="text-[11px] text-muted-foreground mt-1">Must be at least 8 characters</p>
           </div>
           <button type="submit" disabled={loading}
             className="w-full h-11 rounded-lg bg-gradient-to-r from-cyan-500 to-emerald-500 text-gray-900 font-bold text-sm hover:from-cyan-400 hover:to-emerald-400 transition-all disabled:opacity-50 shadow-lg shadow-cyan-500/20">
@@ -74,14 +132,7 @@ export default function SignupPage() {
 
           <button
             type="button"
-            onClick={async () => {
-              const { createClient } = await import("@/lib/supabase/client");
-              const supabase = createClient();
-              await supabase.auth.signInWithOAuth({
-                provider: "google",
-                options: { redirectTo: `${window.location.origin}/dashboard` },
-              });
-            }}
+            onClick={handleGoogleSignup}
             className="w-full h-11 rounded-lg border border-border-default bg-background/50 hover:bg-muted/50 text-foreground font-medium text-sm flex items-center justify-center gap-2 transition-all hover:border-border-hover"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">

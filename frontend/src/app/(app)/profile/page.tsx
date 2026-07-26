@@ -1,21 +1,39 @@
 "use client";
 
-import { useState } from "react";
-import { User, Mail, Shield, Save, Crown, Zap, ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { User, Mail, Shield, Save, Crown, ArrowRight, LogOut } from "lucide-react";
 import { usePlan } from "@/context/PlanContext";
+import { useAuth } from "@/context/AuthContext";
 import { PLANS } from "@/lib/plans";
 import Link from "next/link";
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState({
-    name: "Trader", email: "trader@quantstrike.ai",
-    defaultMarket: "NIFTY", notifications: true, theme: "dark",
-  });
-  const [saved, setSaved] = useState(false);
+  const { user, signOut } = useAuth();
   const { plan, isPro } = usePlan();
   const planConfig = PLANS[plan];
 
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const [displayName, setDisplayName] = useState("");
+  const [defaultMarket, setDefaultMarket] = useState("NIFTY");
+  const [notifications, setNotifications] = useState(true);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setDisplayName(
+        user.user_metadata?.full_name ||
+        user.user_metadata?.display_name ||
+        user.email?.split("@")[0] || "Trader"
+      );
+    }
+  }, [user]);
+
+  const userEmail = user?.email || "trader@quantstrike.ai";
+  const initials = displayName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "QS";
+
+  const handleSave = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -27,11 +45,11 @@ export default function ProfilePage() {
       {/* Avatar + Info */}
       <div className="glass-card p-6 flex items-center gap-6">
         <div className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center text-2xl font-bold text-gray-900">
-          {profile.name.charAt(0).toUpperCase()}
+          {initials}
         </div>
         <div>
-          <h2 className="text-xl font-bold">{profile.name}</h2>
-          <p className="text-sm text-muted-foreground flex items-center gap-1"><Mail size={14} />{profile.email}</p>
+          <h2 className="text-xl font-bold">{displayName}</h2>
+          <p className="text-sm text-muted-foreground flex items-center gap-1"><Mail size={14} />{userEmail}</p>
           <div className="mt-2 flex items-center gap-2">
             <span className="badge badge-call"><Shield size={10} />Verified</span>
             {isPro ? (
@@ -42,6 +60,9 @@ export default function ProfilePage() {
               <span className="badge badge-neutral">Free Plan</span>
             )}
           </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Joined {user?.created_at ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" }) : "—"}
+          </p>
         </div>
       </div>
 
@@ -94,36 +115,47 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Display Name</label>
-            <input type="text" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+            <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
               className="w-full h-10 px-3 rounded-lg bg-background border border-border-default text-sm focus:outline-none focus:border-primary/50" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Email</label>
-            <input type="email" value={profile.email} disabled
+            <input type="email" value={userEmail} disabled
               className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default text-sm text-muted-foreground cursor-not-allowed" />
           </div>
           <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Auth Provider</label>
+            <input type="text" value={user?.app_metadata?.provider || "email"} disabled
+              className="w-full h-10 px-3 rounded-lg bg-surface border border-border-default text-sm text-muted-foreground cursor-not-allowed capitalize" />
+          </div>
+          <div>
             <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Default Market</label>
-            <select value={profile.defaultMarket} onChange={(e) => setProfile({ ...profile, defaultMarket: e.target.value })}
+            <select value={defaultMarket} onChange={(e) => setDefaultMarket(e.target.value)}
               className="w-full h-10 px-3 rounded-lg bg-background border border-border-default text-sm focus:outline-none focus:border-primary/50">
               <option>NIFTY</option><option>BANKNIFTY</option><option>FINNIFTY</option><option>SENSEX</option>
             </select>
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium">Notifications</label>
+              <label className="text-sm font-medium">Email Notifications</label>
               <p className="text-xs text-muted-foreground">Receive alerts via email</p>
             </div>
-            <button onClick={() => setProfile({ ...profile, notifications: !profile.notifications })}
-              className={`w-12 h-6 rounded-full transition-all relative ${profile.notifications ? "bg-primary" : "bg-surface-hover border border-border-default"}`}>
-              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${profile.notifications ? "left-6" : "left-0.5"}`} />
+            <button onClick={() => setNotifications(!notifications)}
+              className={`w-12 h-6 rounded-full transition-all relative ${notifications ? "bg-primary" : "bg-surface-hover border border-border-default"}`}>
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${notifications ? "left-6" : "left-0.5"}`} />
             </button>
           </div>
         </div>
-        <button onClick={handleSave}
-          className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-semibold transition-all ${saved ? "bg-emerald-500/20 text-emerald-400" : "bg-primary text-gray-900 hover:bg-primary-hover"}`}>
-          <Save size={14} /> {saved ? "Saved ✓" : "Save Profile"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={handleSave}
+            className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-semibold transition-all ${saved ? "bg-emerald-500/20 text-emerald-400" : "bg-primary text-gray-900 hover:bg-primary-hover"}`}>
+            <Save size={14} /> {saved ? "Saved ✓" : "Save Profile"}
+          </button>
+          <button onClick={signOut}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-all">
+            <LogOut size={14} /> Sign Out
+          </button>
+        </div>
       </div>
     </div>
   );

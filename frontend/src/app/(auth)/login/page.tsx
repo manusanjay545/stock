@@ -2,19 +2,47 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const router = useRouter();
+  const supabase = createClient();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // In production, integrate with Supabase Auth
-    setTimeout(() => { window.location.href = "/dashboard"; }, 800);
+    setError("");
+    setMessage("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
+    });
+    if (error) setError(error.message);
   };
 
   return (
@@ -35,6 +63,20 @@ export default function LoginPage() {
           <p className="text-sm text-muted-foreground mt-2">Sign in to access AI-powered options analysis</p>
         </div>
 
+        {/* Error / Success Messages */}
+        {error && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <AlertCircle size={16} className="shrink-0" />
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+            <CheckCircle size={16} className="shrink-0" />
+            {message}
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleLogin} className="glass-card p-8 space-y-5">
           <div>
@@ -46,7 +88,12 @@ export default function LoginPage() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Password</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-muted-foreground">Password</label>
+              <Link href="/forgot-password" className="text-xs text-primary hover:text-primary-hover font-medium transition-colors">
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
               <input type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required
@@ -71,14 +118,7 @@ export default function LoginPage() {
 
           <button
             type="button"
-            onClick={async () => {
-              const { createClient } = await import("@/lib/supabase/client");
-              const supabase = createClient();
-              await supabase.auth.signInWithOAuth({
-                provider: "google",
-                options: { redirectTo: `${window.location.origin}/dashboard` },
-              });
-            }}
+            onClick={handleGoogleLogin}
             className="w-full h-11 rounded-lg border border-border-default bg-background/50 hover:bg-muted/50 text-foreground font-medium text-sm flex items-center justify-center gap-2 transition-all hover:border-border-hover"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">

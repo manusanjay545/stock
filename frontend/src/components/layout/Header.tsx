@@ -1,7 +1,9 @@
 "use client";
 
-import { Search, Bell, Menu } from "lucide-react";
-import { useState } from "react";
+import { Search, Bell, Menu, LogOut, User } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
 
 interface HeaderProps {
   sidebarCollapsed?: boolean;
@@ -11,6 +13,23 @@ interface HeaderProps {
 export default function Header({ onMenuClick }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User";
+  const initials = displayName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <header className="sticky top-0 z-30 h-16 flex items-center justify-between px-6 border-b border-border-default bg-surface/80 backdrop-blur-xl">
@@ -51,7 +70,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      {/* Right: Market Status + Notifications */}
+      {/* Right: Market Status + Notifications + User */}
       <div className="flex items-center gap-4">
         {/* Market Status Pill */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10">
@@ -65,10 +84,37 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary animate-pulse" />
         </button>
 
-        {/* User Avatar */}
-        <button className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center text-xs font-bold text-gray-900">
-          QS
-        </button>
+        {/* User Avatar + Dropdown */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center text-xs font-bold text-gray-900 hover:shadow-lg hover:shadow-cyan-500/20 transition-all"
+          >
+            {initials}
+          </button>
+
+          {userMenuOpen && (
+            <div className="absolute right-0 top-full mt-2 w-64 glass-card shadow-xl p-2 animate-fade-in">
+              <div className="px-3 py-2 border-b border-border-default mb-1">
+                <p className="text-sm font-semibold truncate">{displayName}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              </div>
+              <Link
+                href="/profile"
+                onClick={() => setUserMenuOpen(false)}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-surface-hover transition-colors"
+              >
+                <User size={14} /> Profile
+              </Link>
+              <button
+                onClick={signOut}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                <LogOut size={14} /> Sign Out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
