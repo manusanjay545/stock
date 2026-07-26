@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Building, AlertTriangle, ExternalLink, Globe } from "lucide-react";
+import { Search, AlertTriangle, ExternalLink, Globe, LineChart } from "lucide-react";
 import { formatCurrency, formatCompact } from "@/lib/formatters";
+import Link from "next/link";
 
 type FinancialRow = {
   metric: string;
@@ -64,7 +65,7 @@ export default function FundamentalsPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-[1200px] mx-auto">
+    <div className="space-y-6 animate-fade-in max-w-[1200px] mx-auto pb-12">
       {/* Search Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -103,32 +104,39 @@ export default function FundamentalsPage() {
       {data && !loading && (
         <div className="space-y-8 animate-fade-in">
           
-          {/* Company Header & Summary Grid */}
-          <div className="glass-card p-6 space-y-6 border border-border-default shadow-lg">
+          {/* Company Header & Summary Grid (Screener.in style) */}
+          <div className="bg-surface border border-border-default shadow-lg rounded-xl overflow-hidden">
             
-            {/* Top Row: Name, links */}
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-3xl font-bold tracking-tight">{data.info.name}</h2>
-                <div className="flex items-center gap-4 mt-2">
-                  <span className="badge badge-neutral text-xs">{data.symbol}</span>
-                  {data.info.website && (
-                    <a href={data.info.website} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
-                      <Globe size={12} /> Website
-                    </a>
-                  )}
+            <div className="p-6 md:p-8 space-y-6">
+              {/* Top Row: Name, links, and Chart Button */}
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl font-bold tracking-tight text-foreground">{data.info.name}</h2>
+                  <div className="flex items-center gap-4 mt-3">
+                    <span className="px-2 py-1 rounded bg-surface-hover border border-border-default text-xs font-semibold text-muted-foreground">{data.symbol}</span>
+                    {data.info.website && (
+                      <a href={data.info.website} target="_blank" rel="noreferrer" className="text-xs text-primary hover:text-primary-hover flex items-center gap-1 transition-colors">
+                        <Globe size={14} /> Website
+                      </a>
+                    )}
+                  </div>
                 </div>
+                
+                {/* View Chart Button */}
+                <Link href={`/chart?symbol=${data.symbol}`} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-400 transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] font-semibold text-sm">
+                  <LineChart size={18} />
+                  View Technical Chart
+                </Link>
+              </div>
+
+              {/* About / Description */}
+              <div className="text-[13px] text-muted-foreground leading-relaxed">
+                {data.info.about}
               </div>
             </div>
 
-            {/* About / Description */}
-            <div className="text-sm text-muted-foreground leading-relaxed line-clamp-3 hover:line-clamp-none transition-all duration-300">
-              <span className="font-semibold text-foreground">About: </span>
-              {data.info.about}
-            </div>
-
-            {/* Screener Style Key Metrics Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4 border-t border-border-default bg-surface/30 p-4 rounded-xl">
+            {/* Dense Metrics Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-[1px] bg-border-default border-t border-border-default">
               <SummaryMetric label="Market Cap" value={`₹ ${formatCompact(data.info.marketCap)}`} />
               <SummaryMetric label="Current Price" value={`₹ ${formatCurrency(data.info.currentPrice)}`} />
               <SummaryMetric label="High / Low" value={`₹ ${data.info.highLow}`} />
@@ -141,22 +149,22 @@ export default function FundamentalsPage() {
             </div>
           </div>
 
-          {/* Financial Statements */}
+          {/* Financial Statements (Dense Tables) */}
           <FinancialTable 
             title="Profit & Loss" 
-            subtitle="Consolidated Figures in ₹ Crores / Millions" 
+            subtitle="Consolidated Figures in ₹ Crores" 
             data={data.profitAndLoss} 
           />
           
           <FinancialTable 
             title="Balance Sheet" 
-            subtitle="Consolidated Figures in ₹ Crores / Millions" 
+            subtitle="Consolidated Figures in ₹ Crores" 
             data={data.balanceSheet} 
           />
           
           <FinancialTable 
             title="Cash Flows" 
-            subtitle="Consolidated Figures in ₹ Crores / Millions" 
+            subtitle="Consolidated Figures in ₹ Crores" 
             data={data.cashFlow} 
           />
           
@@ -170,9 +178,9 @@ export default function FundamentalsPage() {
 
 function SummaryMetric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="flex flex-col justify-between py-1 border-b border-border-default/50 border-dotted md:border-none md:pb-0">
-      <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</span>
-      <span className="text-lg font-bold text-foreground mt-0.5">{value}</span>
+    <div className="flex flex-col justify-center px-6 py-4 bg-surface hover:bg-surface-hover/50 transition-colors">
+      <span className="text-[12px] text-muted-foreground font-medium mb-1">{label}</span>
+      <span className="text-[15px] font-bold text-foreground">{value}</span>
     </div>
   );
 }
@@ -181,37 +189,38 @@ function FinancialTable({ title, subtitle, data }: { title: string; subtitle: st
   if (!data || !data.dates || data.dates.length === 0) return null;
 
   return (
-    <div className="glass-card overflow-hidden border border-border-default shadow-md">
-      <div className="p-5 border-b border-border-default bg-surface/50">
-        <h3 className="text-xl font-bold tracking-tight">{title}</h3>
-        <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+    <div className="bg-surface rounded-xl overflow-hidden border border-border-default shadow-md">
+      <div className="px-5 py-4 border-b border-border-default flex items-baseline justify-between">
+        <h3 className="text-lg font-bold text-foreground">{title}</h3>
+        <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{subtitle}</p>
       </div>
-      <div className="overflow-x-auto w-full">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto w-full max-w-[100vw] custom-scrollbar">
+        <table className="w-full text-[13px] border-collapse">
           <thead>
-            <tr className="border-b border-border-default bg-surface/20">
-              <th className="sticky left-0 bg-background/95 backdrop-blur z-10 text-left font-semibold text-muted-foreground py-3 pl-5 min-w-[280px]">
+            <tr className="border-b border-border-default bg-surface">
+              <th className="sticky left-0 bg-surface z-10 text-left font-medium text-muted-foreground py-2.5 px-5 min-w-[240px] border-r border-border-default/50">
                 Metric
               </th>
               {data.dates.map((date, idx) => (
-                <th key={idx} className="text-right font-semibold text-muted-foreground py-3 px-4 min-w-[110px]">
+                <th key={idx} className="text-right font-medium text-muted-foreground py-2.5 px-4 min-w-[100px]">
                   {date}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border-default/30">
+          <tbody>
             {data.rows.map((row, i) => {
               // Highlight summary rows visually
-              const isSummaryRow = row.metric.includes("Total") || row.metric.includes("Net Profit") || row.metric.includes("Operating");
+              const isSummaryRow = row.metric.includes("Total") || row.metric.includes("Net Profit") || row.metric.includes("Operating") || row.metric.includes("EPS");
               return (
-                <tr key={i} className={`hover:bg-surface-hover/50 transition-colors ${isSummaryRow ? "bg-surface/10 font-medium" : ""}`}>
-                  <td className="sticky left-0 bg-background/95 backdrop-blur z-10 py-2.5 pl-5 text-foreground/90 whitespace-nowrap overflow-hidden text-ellipsis max-w-[280px]" title={row.metric}>
+                <tr key={i} className={`border-b border-border-default/30 last:border-0 hover:bg-primary/5 transition-colors ${i % 2 !== 0 ? "bg-surface-hover/30" : "bg-surface"} ${isSummaryRow ? "font-semibold" : ""}`}>
+                  <td className="sticky left-0 py-2 px-5 text-foreground/90 whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px] border-r border-border-default/50" 
+                      style={{ backgroundColor: i % 2 !== 0 ? 'var(--color-surface-hover)' : 'var(--color-surface)', zIndex: 10 }}>
                     {row.metric}
                   </td>
                   {row.values.map((val, vIdx) => (
-                    <td key={vIdx} className={`text-right py-2.5 px-4 tabular-nums ${val !== null && val < 0 ? "text-red-400" : "text-foreground"}`}>
-                      {val !== null ? formatCompact(val) : "-"}
+                    <td key={vIdx} className={`text-right py-2 px-4 tabular-nums ${val !== null && val < 0 ? "text-red-400" : "text-foreground"}`}>
+                      {val !== null ? formatCompact(val) : ""}
                     </td>
                   ))}
                 </tr>
@@ -223,3 +232,4 @@ function FinancialTable({ title, subtitle, data }: { title: string; subtitle: st
     </div>
   );
 }
+
