@@ -1,4 +1,4 @@
-"""Google Finance Scraper Service — Fast, reliable real-time quotes without Angel One."""
+"""Google Finance Scraper Service — Accurate real-time quotes from Google Finance."""
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -26,72 +26,102 @@ def get_google_finance_symbol(symbol: str) -> str:
     return symbol_upper
 
 def fetch_quote(symbol: str) -> dict:
-    """Fetch live quote for a given stock or index from Google Finance."""
+    """Fetch live quote for a given stock or index from Google Finance.
+    
+    Uses the following verified CSS class selectors (as of July 2026):
+      - div.N6SYTe  => Main current price (inside parent div.ujg0He)
+      - div.dO6ijd  => Stats row values: Previous Close, Open, High, Low, 52W High, 52W Low, etc.
+      - span.ougHge => Positive % change (green)
+      - span.ymyBi  => Negative % change (red)
+    """
     gf_symbol = get_google_finance_symbol(symbol)
     url = f"https://www.google.com/finance/quote/{gf_symbol}"
     
     try:
-        r = requests.get(url, headers=HEADERS, timeout=4)
+        r = requests.get(url, headers=HEADERS, timeout=5)
         if r.status_code != 200:
-            return {"symbol": symbol, "ltp": 0.0, "netChange": 0.0, "percentChange": 0.0, "isUp": True}
+            return _empty_quote(symbol)
             
         soup = BeautifulSoup(r.text, "html.parser")
         
+        # ── 1. MAIN PRICE ──
+        # The primary price is in a div with class 'N6SYTe' (inside parent 'ujg0He')
         price = 0.0
+        price_div = soup.find("div", class_="N6SYTe")
+        if price_div:
+            price = _parse_number(price_div.text)
         
-        # Look for element with data-last-price attribute or class 'YMlA83'
-        price_tag = soup.find("div", attrs={"data-last-price": True})
-        if price_tag and price_tag.get("data-last-price"):
-            try:
-                price = float(price_tag["data-last-price"])
-            except:
-                pass
-
-        if price == 0.0:
-            # Look for specific Google Finance price containers
-            price_div = soup.find("div", class_=re.compile(r".*YMlA83.*|.*fxJwN.*|.*p6v2fd.*"))
-            if price_div:
-                txt = price_div.text.strip().replace("₹", "").replace("$", "").replace(",", "")
-                try:
-                    price = float(txt)
-                except:
-                    pass
-
-        if price == 0.0:
-            # Fallback search for price string in main header
-            for el in soup.find_all(["div", "span"]):
-                txt = el.text.strip().replace("₹", "").replace("$", "").replace(",", "")
-                if re.match(r"^[0-9,]+\.[0-9]{2}$", txt) and len(el.find_all()) == 0:
-                    try:
-                        val = float(txt)
-                        if val > 50: # Real stock price threshold
-                            price = val
-                            break
-                    except:
-                        pass
-
-        # Percentage change
+        # ── 2. PERCENTAGE CHANGE ──
         percent_change = 0.0
-        change_elem = soup.select_one("div.JwB6zf, span.ougHge, span.ymyBi")
-        if change_elem:
-            text = change_elem.text.strip().replace(",", "")
+        is_up = True
+        
+        # Green (positive) change
+        change_span = soup.find("span", class_="ougHge")
+        if change_span:
+            text = change_span.text.strip()
             if "%" in text:
-                val = text.replace("%", "").replace("+", "").strip()
-                try:
-                    percent_change = float(val)
-                except:
-                    pass
-                
+                percent_change = _parse_number(text.replace("%", ""))
+                is_up = True
+        
+        # Red (negative) change — check if this appears instead
+        if percent_change == 0.0:
+            change_span = soup.find("span", class_="ymyBi")
+            if change_span:
+                text = change_span.text.strip()
+                if "%" in text:
+                    percent_change = _parse_number(text.replace("%", ""))
+                    is_up = False
+
+        # ── 3. STATS (Open, High, Low, 52W High, 52W Low) ──
+        stats = []
+        for stat_div in soup.find_all("div", class_="dO6ijd"):
+            val = _parse_number(stat_div.text)
+            if val > 0:
+                stats.append(val)
+        
+        # Google Finance stats order: Previous Close, Open, High, Low, 52W High, 52W Low, ...
+        # (duplicated once for mobile/desktop, so first 6 are what we need)
+        prev_close = stats[0] if len(stats) > 0 else price
+        open_price = stats[0] if len(stats) > 0 else price
+        high_price = stats[1] if len(stats) > 1 else price
+        low_price  = stats[2] if len(stats) > 2 else price
+        high_52w   = stats[3] if len(stats) > 3 else price
+        low_52w    = stats[4] if len(stats) > 4 else price
+        
+        # Calculate net change from previous close
+        net_change = round(price - prev_close, 2) if prev_close > 0 else 0.0
+        if net_change != 0 and percent_change == 0:
+            percent_change = round((net_change / prev_close) * 100, 2)
+        
         return {
             "symbol": symbol,
-            "ltp": price if price > 0 else 1280.50, # Clean fallback if offline
-            "open": price,
-            "high": price,
-            "low": price,
-            "netChange": 0.0,
+            "ltp": price,
+            "open": open_price,
+            "high": high_price,
+            "low": low_price,
+            "high52": high_52w,
+            "low52": low_52w,
+            "prevClose": prev_close,
+            "netChange": net_change,
             "percentChange": percent_change,
-            "isUp": percent_change >= 0
+            "isUp": is_up
         }
     except Exception as e:
-        print(f"Error fetching Google Finance quote for {symbol}: {e}")
-        return {"symbol": symbol, "ltp": 1280.50, "netChange": 0.0, "percentChange": 0.0, "isUp": True}
+        print(f"Google Finance scraper error for {symbol}: {e}")
+        return _empty_quote(symbol)
+
+def _parse_number(text: str) -> float:
+    """Clean and parse a number string like '₹1,281.00' or '+2.39%' into a float."""
+    cleaned = text.strip()
+    cleaned = cleaned.replace("₹", "").replace("$", "").replace(",", "").replace("+", "").replace("%", "").strip()
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
+def _empty_quote(symbol: str) -> dict:
+    return {
+        "symbol": symbol, "ltp": 0.0, "open": 0.0, "high": 0.0, "low": 0.0,
+        "high52": 0.0, "low52": 0.0, "prevClose": 0.0,
+        "netChange": 0.0, "percentChange": 0.0, "isUp": True
+    }
