@@ -1,0 +1,25 @@
+# Core dependencies
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+gunicorn==23.0.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+httpx==0.28.1
+python-dotenv==1.0.1
+python-multipart==0.0.20
+supabase==2.11.0
+numpy==1.26.4
+
+# Angel One SmartAPI
+smartapi-python==1.4.1
+pyotp==2.9.0
+logzero==1.7.0
+websocket-client==1.8.0
+
+# Redis & Background tasks
+redis==5.2.1
+
+# Data
+pandas==2.2.3
