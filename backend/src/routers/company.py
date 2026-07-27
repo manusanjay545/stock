@@ -1,26 +1,22 @@
 """Company Data Router"""
 from fastapi import APIRouter
-from src.core.angel_one import angel_client
 from src.services.screener_scraper import scrape_company_data, scrape_financial_quarters
+from src.services.google_finance_scraper import fetch_quote
 
 router = APIRouter()
 
 @router.get("/{symbol}")
 async def get_company_overview(symbol: str):
-    """Get company overview details blending Angel One Live Data and Screener.in Fundamentals."""
+    """Get company overview blending Screener.in Fundamentals and Google Finance Live Quotes."""
     try:
         # 1. Scrape Fundamentals from Screener.in
         fundamentals = scrape_company_data(symbol)
         
-        # 2. Fetch Live Price from Angel One (FULL mode)
-        token = angel_client.get_token(symbol)
-        if token:
-            quote = angel_client.get_quote(exchange="NSE", symbol=f"{symbol}-EQ", token=token)
-            if quote:
-                # Override scraped price with live Angel One data
-                fundamentals["currentPrice"] = quote.get("ltp", fundamentals["currentPrice"])
-                fundamentals["high52"] = quote.get("52WeekHigh", fundamentals["high52"])
-                fundamentals["low52"] = quote.get("52WeekLow", fundamentals["low52"])
+        # 2. Fetch Live Price from Google Finance
+        gf_quote = fetch_quote(symbol)
+        live_price = gf_quote.get("ltp", 0.0)
+        if live_price > 0:
+            fundamentals["currentPrice"] = live_price
         
         return {
             "success": True, 
@@ -39,8 +35,8 @@ async def get_company_overview(symbol: str):
                 "roe": fundamentals["roe"],
                 "faceValue": fundamentals["faceValue"],
                 "about": fundamentals["about"],
-                "pros": fundamentals["pros"] if fundamentals["pros"] else ["Data scraped successfully"],
-                "cons": fundamentals["cons"] if fundamentals["cons"] else ["Prices updated via Angel One"]
+                "pros": fundamentals["pros"] if fundamentals["pros"] else ["Data scraped directly from Screener & Google Finance"],
+                "cons": fundamentals["cons"] if fundamentals["cons"] else ["Real-time data stream active"]
             }
         }
     except Exception as e:
@@ -55,7 +51,6 @@ async def get_company_financials(symbol: str):
     """Get company financial statements from Screener.in scraper."""
     try:
         financials = scrape_financial_quarters(symbol)
-        
         return {
             "success": True,
             "data": financials

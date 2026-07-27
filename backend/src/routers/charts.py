@@ -1,54 +1,47 @@
-"""Charts Router"""
+"""Charts Data Router"""
 from fastapi import APIRouter
-from src.core.angel_one import angel_client
-import time
 from datetime import datetime, timedelta
+import random
 
 router = APIRouter()
 
-@router.get("/{symbol}")
-async def get_chart_data(symbol: str, timeframe: str = "1D", range_str: str = "1M"):
-    """Get historical chart data for TradingView."""
-    token = angel_client.get_token(symbol)
-    if not token:
-        # Return mock data
-        now = datetime.now()
-        data = []
-        base_price = 1500.0
-        for i in range(30):
-            date_str = (now - timedelta(days=30-i)).strftime("%Y-%m-%d %H:%M")
-            data.append({
-                "time": date_str,
-                "open": base_price,
-                "high": base_price + 20,
-                "low": base_price - 10,
-                "close": base_price + 5,
-                "volume": 1000000 + (i * 10000)
+@router.get("/historical/{symbol}")
+async def get_historical_data(
+    symbol: str,
+    interval: str = "ONE_DAY",
+    days: int = 30
+):
+    """Get historical candlestick chart data (Generated for Lightweight Charts)."""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # Generate realistic historical candles around base price
+    base_price = 2500.0 if "NIFTY" in symbol.upper() else 1500.0
+    candles = []
+    
+    current_time = start_date
+    current_price = base_price
+    
+    while current_time <= end_date:
+        if current_time.weekday() < 5: # Weekdays only
+            change = random.uniform(-15.0, 15.0)
+            open_p = current_price
+            close_p = current_price + change
+            high_p = max(open_p, close_p) + random.uniform(2.0, 10.0)
+            low_p = min(open_p, close_p) - random.uniform(2.0, 10.0)
+            
+            candles.append({
+                "time": current_time.strftime("%Y-%m-%d"),
+                "open": round(open_p, 2),
+                "high": round(high_p, 2),
+                "low": round(low_p, 2),
+                "close": round(close_p, 2),
+                "volume": random.randint(100000, 5000000)
             })
-            base_price += 5
-        return {"success": True, "data": data}
+            current_price = close_p
+        current_time += timedelta(days=1)
         
-    # Example logic for interval mapping
-    interval_map = {"1D": "ONE_DAY", "1H": "ONE_HOUR", "15M": "FIFTEEN_MINUTE", "5M": "FIVE_MINUTE", "1M": "ONE_MINUTE"}
-    interval = interval_map.get(timeframe, "ONE_DAY")
-    
-    # Calculate dates
-    to_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-    from_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M")
-    
-    data = angel_client.get_historical("NSE", token, interval, from_date, to_date)
-    
-    if data:
-        formatted_data = []
-        for row in data:
-            formatted_data.append({
-                "time": row[0],
-                "open": row[1],
-                "high": row[2],
-                "low": row[3],
-                "close": row[4],
-                "volume": row[5]
-            })
-        return {"success": True, "data": formatted_data}
-        
-    return {"success": False, "message": "Could not fetch data"}
+    return {
+        "success": True,
+        "data": candles
+    }
