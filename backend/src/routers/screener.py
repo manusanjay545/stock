@@ -1,7 +1,8 @@
 """Screener Router"""
 from fastapi import APIRouter
 from pydantic import BaseModel
-import yfinance as yf
+from src.core.angel_one import angel_client
+from src.services.screener_scraper import scrape_company_data
 
 router = APIRouter()
 
@@ -12,37 +13,37 @@ class ScreenerQuery(BaseModel):
 @router.post("/run")
 async def run_screener(query: ScreenerQuery):
     """Run a stock screen based on query parameters.
-    Since we don't have a full database of all 5000+ stocks fundamentals locally yet, 
-    we will simulate the screening on a preset universe using yfinance for live data.
+    Since we removed yfinance, we will use a preset universe, 
+    pull live Angel One quotes, and optionally augment with scraped fundamental data.
     """
-    
-    # Preset universe for demonstration (in production, this would query the Supabase DB)
-    universe = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ITC.NS", "HINDUNILVR.NS", "SBIN.NS", "BHARTIARTL.NS"]
+    universe = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ITC", "HINDUNILVR", "SBIN", "BHARTIARTL"]
     
     results = []
     
-    # Parse query simply to demonstrate (e.g. "Market Capitalization > 10000")
-    # For Phase 2, we just pull real data for the universe and return it.
     try:
-        tickers = yf.Tickers(" ".join(universe))
-        
         s_no = 1
-        for symbol, ticker in tickers.tickers.items():
-            info = ticker.info
-            if not info:
-                continue
-                
-            clean_symbol = symbol.replace(".NS", "")
+        for symbol in universe:
+            # First get live price from Angel One
+            token = angel_client.get_token(symbol)
+            quote = None
+            if token:
+                quote = angel_client.get_quote(exchange="NSE", symbol=f"{symbol}-EQ", token=token)
+            
+            # Since the screener UI requires P/E, Mar Cap etc, we scrape it for the universe
+            fundamentals = scrape_company_data(symbol)
+            
+            cmp = quote.get("ltp", fundamentals.get("currentPrice", 0)) if quote else fundamentals.get("currentPrice", 0)
+            
             results.append({
                 "sNo": s_no,
-                "symbol": clean_symbol,
-                "name": info.get("shortName", clean_symbol),
-                "cmp": info.get("currentPrice", info.get("regularMarketPrice", 0)),
-                "pe": info.get("trailingPE", 0),
-                "marCap": round(info.get("marketCap", 0) / 10000000, 2) if info.get("marketCap") else 0, # Crores
-                "divYield": round((info.get("dividendYield", 0) * 100), 2) if info.get("dividendYield") else 0,
-                "npQtr": round(info.get("netIncomeToCommon", 0) / 10000000, 2) if info.get("netIncomeToCommon") else 0,
-                "qtrProfitVar": 5.0 # Simulated
+                "symbol": symbol,
+                "name": f"{symbol} Limited",
+                "cmp": cmp,
+                "pe": fundamentals.get("pe", 0),
+                "marCap": fundamentals.get("marketCap", 0),
+                "divYield": fundamentals.get("dividendYield", 0),
+                "npQtr": 0, # Cannot scrape easily inside a loop without slowing down heavily
+                "qtrProfitVar": 0 
             })
             s_no += 1
             

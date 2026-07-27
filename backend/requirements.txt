@@ -18,9 +18,12 @@ pyotp==2.9.0
 logzero==1.7.0
 websocket-client==1.8.0
 
+# Scraper
+beautifulsoup4==4.12.3
+requests==2.31.0
+
 # Redis & Background tasks
 redis==5.2.1
 
 # Data
 pandas==2.2.3
-yfinance==0.2.36
