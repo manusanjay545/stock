@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.core.config import settings
+import uvicorn
 
 # Import routers
 from src.routers.market import router as market_router
@@ -49,3 +50,6 @@ app.include_router(subscription_router, prefix="/api/v1/subscription", tags=["Su
 @app.get("/")
 async def root():
     return {"name": settings.APP_NAME, "version": settings.APP_VERSION, "status": "running"}
+
+if __name__ == "__main__":
+    uvicorn.run("src.main:app", host="127.0.0.1", port=8000, reload=False)
