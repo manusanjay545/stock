@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Pulse — Top Gainers & Losers with RSI Scanner</title>
+    <meta name="description" content="Real-time NSE stock scanner showing top gainers, losers, and RSI above 70 powered by Groww API.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div class="bg-glow bg-glow-3"></div>
+
+    <!-- Header -->
+    <header id="main-header">
+        <div class="header-inner">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 32 32" fill="none">
+                        <path d="M4 24L10 14L16 18L22 8L28 12" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M4 24L10 14L16 18L22 8L28 12" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.3" filter="blur(4px)"/>
+                        <defs>
+                            <linearGradient id="grad1" x1="4" y1="24" x2="28" y2="8">
+                                <stop offset="0%" stop-color="#00D4AA"/>
+                                <stop offset="100%" stop-color="#00B4FF"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="logo-title">Market Pulse</h1>
+                    <p class="logo-subtitle">NIFTY 50 Scanner</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="status-badge" id="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="status-text">Connecting...</span>
+                </div>
+                <button class="refresh-btn" id="refresh-btn" title="Refresh Data">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                </button>
+                <div class="last-updated" id="last-updated"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-content">
+        <!-- Stats Bar -->
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card stat-card--total">
+                <div class="stat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Total Stocks</span>
+                    <span class="stat-value" id="total-stocks">—</span>
+                </div>
+            </div>
+            <div class="stat-card stat-card--gainers">
+                <div class="stat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Gainers</span>
+                    <span class="stat-value" id="gainer-count">—</span>
+                </div>
+            </div>
+            <div class="stat-card stat-card--losers">
+                <div class="stat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Losers</span>
+                    <span class="stat-value" id="loser-count">—</span>
+                </div>
+            </div>
+            <div class="stat-card stat-card--rsi">
+                <div class="stat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">RSI &gt; 70</span>
+                    <span class="stat-value" id="rsi-count">—</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar" id="filter-bar">
+            <div class="filter-group">
+                <label for="sector-filter">Sector:</label>
+                <select id="sector-filter" class="filter-select">
+                    <option value="All">All Sectors</option>
+                    <option value="IT">IT</option>
+                    <option value="Financial Services">Financial Services</option>
+                    <option value="FMCG">FMCG</option>
+                    <option value="Automobile">Automobile</option>
+                    <option value="Pharma & Healthcare">Pharma & Healthcare</option>
+                    <option value="Oil & Gas">Oil & Gas</option>
+                    <option value="Metals & Mining">Metals & Mining</option>
+                    <option value="Power & Energy">Power & Energy</option>
+                    <option value="Consumer Durables">Consumer Durables</option>
+                    <option value="Construction & Real Estate">Construction & Real Estate</option>
+                    <option value="Chemicals">Chemicals</option>
+                    <option value="Capital Goods & Defense">Capital Goods & Defense</option>
+                    <option value="Building Materials">Building Materials</option>
+                    <option value="Services (Retail, Logistics, Telecom)">Services</option>
+                    <option value="Others">Others</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="nifty50-filter"> 
+                    <span class="custom-checkbox"></span>
+                    Nifty 50 Only
+                </label>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav" id="tab-nav">
+            <button class="tab-btn active" data-tab="gainers" id="tab-gainers">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"/></svg>
+                Gainers (RSI &gt; 70)
+            </button>
+            <button class="tab-btn" data-tab="losers" id="tab-losers">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12 13a1 1 0 100 2h5a1 1 0 001-1V9a1 1 0 10-2 0v2.586l-4.293-4.293a1 1 0 00-1.414 0L8 9.586 3.707 5.293a1 1 0 00-1.414 1.414l5 5a1 1 0 001.414 0L11 9.414 14.586 13H12z" clip-rule="evenodd"/></svg>
+                Losers (RSI &lt; 30)
+            </button>
+            <button class="tab-btn" data-tab="rsi" id="tab-rsi">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+                All RSI &gt; 70
+                <span class="tab-badge" id="rsi-badge">0</span>
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-state" id="loading-state">
+            <div class="loading-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring spinner-ring-2"></div>
+                <div class="spinner-ring spinner-ring-3"></div>
+            </div>
+            <h2 class="loading-title">Initializing Historical Data</h2>
+            <p class="loading-subtitle">Fetching last 30 days of daily closes for NIFTY 50 stocks (this may take a few seconds)...</p>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-state hidden" id="error-state">
+            <div class="error-icon">⚠️</div>
+            <h2 class="error-title">Unable to fetch market data</h2>
+            <p class="error-message" id="error-message"></p>
+            <button class="retry-btn" id="retry-btn">Try Again</button>
+        </div>
+
+        <!-- Data Tables -->
+        <div class="table-container hidden" id="table-container">
+            <!-- Gainers Table -->
+            <div class="data-panel active" id="panel-gainers">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <span class="panel-icon gainer-icon">▲</span>
+                        Top Gainers with RSI &gt; 70
+                    </h2>
+                    <span class="panel-count" id="gainers-count-label"></span>
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table" id="gainers-table">
+                        <thead>
+                            <tr>
+                                <th class="th-rank">#</th>
+                                <th class="th-symbol">Symbol</th>
+                                <th class="th-sector">Sector</th>
+                                <th class="th-price">LTP</th>
+                                <th class="th-change">Change</th>
+                                <th class="th-percent">% Change</th>
+                                <th class="th-ohlc">Open</th>
+                                <th class="th-ohlc">High</th>
+                                <th class="th-ohlc">Low</th>
+                                <th class="th-rsi">RSI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gainers-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Losers Table -->
+            <div class="data-panel" id="panel-losers">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <span class="panel-icon loser-icon">▼</span>
+                        Top Losers with RSI &lt; 30
+                    </h2>
+                    <span class="panel-count" id="losers-count-label"></span>
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table" id="losers-table">
+                        <thead>
+                            <tr>
+                                <th class="th-rank">#</th>
+                                <th class="th-symbol">Symbol</th>
+                                <th class="th-sector">Sector</th>
+                                <th class="th-price">LTP</th>
+                                <th class="th-change">Change</th>
+                                <th class="th-percent">% Change</th>
+                                <th class="th-ohlc">Open</th>
+                                <th class="th-ohlc">High</th>
+                                <th class="th-ohlc">Low</th>
+                                <th class="th-rsi">RSI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="losers-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- RSI Table -->
+            <div class="data-panel" id="panel-rsi">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <span class="panel-icon rsi-icon">⚡</span>
+                        All Stocks RSI &gt; 70 (Overbought)
+                    </h2>
+                    <span class="panel-count" id="rsi-count-label"></span>
+                </div>
+                <div class="rsi-info-banner">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                    <span>Stocks with RSI &gt; 70 are considered <strong>overbought</strong> and may be due for a pullback.</span>
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table" id="rsi-table">
+                        <thead>
+                            <tr>
+                                <th class="th-rank">#</th>
+                                <th class="th-symbol">Symbol</th>
+                                <th class="th-sector">Sector</th>
+                                <th class="th-price">LTP</th>
+                                <th class="th-change">Change</th>
+                                <th class="th-percent">% Change</th>
+                                <th class="th-rsi">RSI (14)</th>
+                                <th class="th-signal">Signal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rsi-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="no-data hidden" id="no-rsi-data">
+                    <div class="no-data-icon">📊</div>
+                    <h3>No stocks with RSI &gt; 70</h3>
+                    <p>None of the NIFTY 50 stocks currently have RSI above 70.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer id="main-footer">
+        <div class="footer-inner">
+            <p>Data powered by <strong>Groww API</strong> · RSI calculated on 14-day daily candles · Auto-refreshes every <strong>2s</strong></p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
