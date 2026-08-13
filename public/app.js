@@ -164,16 +164,13 @@
     return `
       <tr>
         <td><span class="rank-num ${rankClass}">${index + 1}</span></td>
-        <td class="symbol-cell">${stock.symbol}</td>
+        <td class="symbol-cell"><a href="https://in.tradingview.com/chart/?symbol=NSE:${stock.symbol}" target="_blank" style="color: inherit; text-decoration: none;" title="View on TradingView">${stock.symbol}</a></td>
         <td class="sector-cell"><span class="sector-badge">${stock.sector || 'Others'}</span></td>
         <td class="price-cell">${formatPrice(stock.ltp)}</td>
         <td class="change-positive">${formatChange(stock.change)}</td>
         <td>
           <span class="percent-badge positive">▲ ${formatPercent(stock.changePercent)}</span>
         </td>
-        <td style="color: var(--text-secondary)">${formatPrice(stock.open)}</td>
-        <td style="color: var(--text-secondary)">${formatPrice(stock.high)}</td>
-        <td style="color: var(--text-secondary)">${formatPrice(stock.low)}</td>
         <td>${renderRsiCell(stock.rsi)}</td>
       </tr>
     `;
@@ -184,16 +181,13 @@
     return `
       <tr>
         <td><span class="rank-num ${rankClass}">${index + 1}</span></td>
-        <td class="symbol-cell">${stock.symbol}</td>
+        <td class="symbol-cell"><a href="https://in.tradingview.com/chart/?symbol=NSE:${stock.symbol}" target="_blank" style="color: inherit; text-decoration: none;" title="View on TradingView">${stock.symbol}</a></td>
         <td class="sector-cell"><span class="sector-badge">${stock.sector || 'Others'}</span></td>
         <td class="price-cell">${formatPrice(stock.ltp)}</td>
         <td class="change-negative">${formatChange(stock.change)}</td>
         <td>
           <span class="percent-badge negative">▼ ${formatPercent(stock.changePercent)}</span>
         </td>
-        <td style="color: var(--text-secondary)">${formatPrice(stock.open)}</td>
-        <td style="color: var(--text-secondary)">${formatPrice(stock.high)}</td>
-        <td style="color: var(--text-secondary)">${formatPrice(stock.low)}</td>
         <td>${renderRsiCell(stock.rsi)}</td>
       </tr>
     `;
@@ -208,7 +202,7 @@
     return `
       <tr>
         <td><span class="rank-num">${index + 1}</span></td>
-        <td class="symbol-cell">${stock.symbol}</td>
+        <td class="symbol-cell"><a href="https://in.tradingview.com/chart/?symbol=NSE:${stock.symbol}" target="_blank" style="color: inherit; text-decoration: none;" title="View on TradingView">${stock.symbol}</a></td>
         <td class="sector-cell"><span class="sector-badge">${stock.sector || 'Others'}</span></td>
         <td class="price-cell">${formatPrice(stock.ltp)}</td>
         <td class="${changeClass}">${formatChange(stock.change)}</td>
