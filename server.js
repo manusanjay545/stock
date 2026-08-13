@@ -13,7 +13,10 @@ let GROWW_ACCESS_TOKEN = null;
 let GROWW_HEADERS = {
   'x-api-key': GROWW_SECRET,
   'X-API-VERSION': '1.0',
-  'Accept': 'application/json'
+  'Accept': 'application/json, text/plain, */*',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Origin': 'https://groww.in',
+  'Referer': 'https://groww.in/'
 };
 
 async function authenticateGroww() {
@@ -170,14 +173,15 @@ function processHistoricalData(symbol, data) {
 // ── Initialize history for all F&O stocks ──
 async function initializeHistory() {
   console.log("\n📈 Fetching historical data from Groww API...");
-  let success = 0;
-  // Fetch one at a time with 1.5s delay to respect rate limits
-  for (let i = 0; i < FNO_STOCKS.length; i++) {
-    await fetchGrowwHistory(FNO_STOCKS[i]);
-    await new Promise(r => setTimeout(r, 1500));
+  // Fetch in chunks of 5 with 1s delay to speed up Render startup (avoids timeouts)
+  for (let i = 0; i < FNO_STOCKS.length; i += 5) {
+    const chunk = FNO_STOCKS.slice(i, i + 5);
+    await Promise.all(chunk.map(symbol => fetchGrowwHistory(symbol)));
+    await new Promise(r => setTimeout(r, 1000));
   }
-  success = Object.keys(historicalData).length;
-  console.log(`✅ Historical data initialized: ${success}/${FNO_STOCKS.length} stocks loaded.\n`);
+
+  const loadedCount = Object.keys(historicalData).length;
+  console.log(`✅ Historical data initialized: ${loadedCount}/${FNO_STOCKS.length} stocks loaded.\n`);
 }
 
 // ── Groww API: Fetch single live quote ──
@@ -212,7 +216,7 @@ async function fetchGrowwOHLC(symbol) {
 async function pollLiveQuotes() {
   try {
     const growwResults = [];
-    const chunkSize = 3; // Rate limit friendly
+    const chunkSize = 5; // Rate limit friendly
 
     for (let i = 0; i < FNO_STOCKS.length; i += chunkSize) {
       const chunk = FNO_STOCKS.slice(i, i + chunkSize);
