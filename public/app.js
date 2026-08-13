@@ -319,7 +319,14 @@
       elements.tableContainer.classList.remove('hidden');
 
       renderData(data);
-      setStatus('live', 'Live');
+      
+      if (data.isFetching) {
+        setStatus('loading', 'Fetching quotes...');
+        elements.refreshBtn.classList.add('spinning');
+      } else {
+        setStatus('live', 'Live');
+        elements.refreshBtn.classList.remove('spinning');
+      }
 
     } catch (error) {
       console.error('Fetch error:', error);
@@ -332,8 +339,6 @@
       }
 
       setStatus('error', 'Error');
-
-    } finally {
       elements.refreshBtn.classList.remove('spinning');
     }
   }

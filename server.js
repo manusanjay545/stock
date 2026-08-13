@@ -261,7 +261,18 @@ async function fetchGrowwQuote(symbol) {
 }
 
 // ── Poll live quotes from Groww every cycle ──
+// IMPORTANT: Data is only committed to latestMarketData AFTER all stocks are fetched.
+// This prevents the frontend from seeing partial/incomplete data during a fetch cycle.
+let isFetching = false;
+
 async function pollLiveQuotes() {
+  // Prevent overlapping fetch cycles
+  if (isFetching) {
+    console.log('⏳ Previous fetch cycle still in progress, skipping...');
+    return;
+  }
+  isFetching = true;
+
   try {
     // Re-authenticate if no token
     if (!GROWW_ACCESS_TOKEN) {
@@ -271,12 +282,20 @@ async function pollLiveQuotes() {
 
     const growwResults = [];
     const chunkSize = 5;
+    const totalChunks = Math.ceil(FNO_STOCKS.length / chunkSize);
+
+    console.log(`📡 Starting full fetch cycle: ${FNO_STOCKS.length} stocks in ${totalChunks} chunks...`);
 
     for (let i = 0; i < FNO_STOCKS.length; i += chunkSize) {
       const chunk = FNO_STOCKS.slice(i, i + chunkSize);
       const chunkPromises = chunk.map(sym => fetchGrowwQuote(sym));
       const chunkRes = await Promise.all(chunkPromises);
       growwResults.push(...chunkRes.filter(r => r !== null && r.data));
+
+      // Log progress without updating latestMarketData
+      const chunkNum = Math.floor(i / chunkSize) + 1;
+      console.log(`  📦 Chunk ${chunkNum}/${totalChunks} done (${growwResults.length} stocks received so far)`);
+
       await new Promise(r => setTimeout(r, 1000));
     }
 
@@ -286,8 +305,9 @@ async function pollLiveQuotes() {
       return;
     }
 
-    console.log(`📊 Received live quotes for ${growwResults.length}/${FNO_STOCKS.length} stocks`);
+    console.log(`✅ Full cycle complete: ${growwResults.length}/${FNO_STOCKS.length} stocks received. Building market data...`);
 
+    // --- Build the complete dataset in a temporary variable ---
     const allStocks = growwResults.map(item => {
       const symbol = item.symbol;
       const quote = item.data;
@@ -352,7 +372,8 @@ async function pollLiveQuotes() {
       .filter(s => s.rsi !== null && s.rsi <= 30)
       .sort((a, b) => a.rsi - b.rsi);
 
-    latestMarketData = {
+    // --- ATOMIC UPDATE: Only now do we commit the complete dataset ---
+    const newMarketData = {
       gainers,
       losers,
       rsiAbove70,
@@ -362,9 +383,14 @@ async function pollLiveQuotes() {
       totalStocks: allStocks.length
     };
 
+    latestMarketData = newMarketData;
     lastUpdate = Date.now();
+
+    console.log(`🔄 Market data updated atomically: ${allStocks.length} stocks, ${gainers.length} gainers, ${losers.length} losers, ${rsiAbove70.length} RSI>70`);
   } catch (err) {
     console.error("Error polling Groww quotes:", err.message);
+  } finally {
+    isFetching = false;
   }
 }
 
@@ -378,7 +404,10 @@ app.get('/api/market-data', (req, res) => {
       totalStocks: FNO_STOCKS.length
     });
   }
-  res.json(latestMarketData);
+  res.json({
+    ...latestMarketData,
+    isFetching
+  });
 });
 
 app.get('/api/refresh', (req, res) => {
@@ -392,6 +421,7 @@ app.get('/api/status', (req, res) => {
     historicalLoaded: Object.keys(historicalData).length,
     totalStocks: FNO_STOCKS.length,
     hasLiveData: !!latestMarketData,
+    isFetching,
     lastUpdate: lastUpdate ? new Date(lastUpdate).toISOString() : null,
     authenticated: !!GROWW_ACCESS_TOKEN
   });
