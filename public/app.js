@@ -17,12 +17,19 @@
   const KEY_WL = 'mp_watchlist';
   const KEY_SNAP = 'mp_snapshots';
   const KEY_LAST = 'mp_last_visit';
+  const KEY_PORTFOLIO = 'mp_paper_portfolio';
+  const KEY_ORDERS = 'mp_paper_orders';
+  const KEY_BALANCE = 'mp_paper_balance';
+  const INITIAL_BALANCE = 1000000; // ₹10,00,000
 
   let watchlist = JSON.parse(localStorage.getItem(KEY_WL) || '["RELIANCE","TCS","HDFCBANK","INFY","ITC"]');
   let snapshots = JSON.parse(localStorage.getItem(KEY_SNAP) || '{}');
   let lastVisit = parseInt(localStorage.getItem(KEY_LAST)) || Date.now();
   let currentStocks = [];
   let hasUnseen = false;
+  let currentDetailSymbol = null;
+  let currentDetailLtp = 0;
+  let orderSide = 'BUY'; // current selected side for order panel
 
   const el = {
     search: document.getElementById('search-input'),
@@ -193,6 +200,90 @@
 
       if (reasons.length === 0) return null;
       return { level, reasons, diff: pDiff };
+    }
+  };
+
+  // ── Paper Trading System ──
+  const PaperTrade = {
+    getBalance() {
+      const saved = localStorage.getItem(KEY_BALANCE);
+      return saved !== null ? parseFloat(saved) : INITIAL_BALANCE;
+    },
+    setBalance(val) {
+      localStorage.setItem(KEY_BALANCE, val.toString());
+    },
+    getPortfolio() {
+      return JSON.parse(localStorage.getItem(KEY_PORTFOLIO) || '{}');
+    },
+    savePortfolio(p) {
+      localStorage.setItem(KEY_PORTFOLIO, JSON.stringify(p));
+    },
+    getOrders() {
+      return JSON.parse(localStorage.getItem(KEY_ORDERS) || '[]');
+    },
+    saveOrders(o) {
+      localStorage.setItem(KEY_ORDERS, JSON.stringify(o));
+    },
+
+    buy(symbol, qty, price) {
+      const total = qty * price;
+      let balance = this.getBalance();
+      if (total > balance) {
+        toast('Insufficient paper balance!');
+        return false;
+      }
+      balance -= total;
+      this.setBalance(balance);
+
+      const portfolio = this.getPortfolio();
+      if (portfolio[symbol]) {
+        const h = portfolio[symbol];
+        const newQty = h.qty + qty;
+        h.avgPrice = ((h.avgPrice * h.qty) + (price * qty)) / newQty;
+        h.qty = newQty;
+      } else {
+        portfolio[symbol] = { qty, avgPrice: price };
+      }
+      this.savePortfolio(portfolio);
+
+      const orders = this.getOrders();
+      orders.unshift({ ts: Date.now(), symbol, side: 'BUY', qty, price, total });
+      this.saveOrders(orders);
+
+      toast(`📗 Paper BUY: ${qty} × ${symbol} @ ₹${price.toLocaleString('en-IN')}`);
+      return true;
+    },
+
+    sell(symbol, qty, price) {
+      const portfolio = this.getPortfolio();
+      if (!portfolio[symbol] || portfolio[symbol].qty < qty) {
+        toast('You don\'t hold enough shares to sell!');
+        return false;
+      }
+      const total = qty * price;
+      let balance = this.getBalance();
+      balance += total;
+      this.setBalance(balance);
+
+      portfolio[symbol].qty -= qty;
+      if (portfolio[symbol].qty <= 0) {
+        delete portfolio[symbol];
+      }
+      this.savePortfolio(portfolio);
+
+      const orders = this.getOrders();
+      orders.unshift({ ts: Date.now(), symbol, side: 'SELL', qty, price, total });
+      this.saveOrders(orders);
+
+      toast(`📕 Paper SELL: ${qty} × ${symbol} @ ₹${price.toLocaleString('en-IN')}`);
+      return true;
+    },
+
+    reset() {
+      this.setBalance(INITIAL_BALANCE);
+      this.savePortfolio({});
+      this.saveOrders([]);
+      toast('Portfolio reset to ₹10,00,000');
     }
   };
 
@@ -398,6 +489,51 @@
       // Order panel header
       document.getElementById('op-title').textContent = data.companyName;
       document.getElementById('op-sub-price').textContent = `NSE ₹${data.ltp.toLocaleString('en-IN', {minimumFractionDigits:2})}`;
+
+      // Save current detail context for order panel
+      currentDetailSymbol = data.symbol;
+      currentDetailLtp = data.ltp;
+      orderSide = 'BUY';
+
+      // Wire order panel
+      const opQty = document.getElementById('op-qty');
+      const opBalance = document.getElementById('op-balance');
+      const opRequired = document.getElementById('op-required');
+      const opActionBtn = document.getElementById('op-action-btn');
+      const opTabBuy = document.getElementById('op-tab-buy');
+      const opTabSell = document.getElementById('op-tab-sell');
+
+      function updateOrderPanel() {
+        const q = parseInt(opQty.value) || 0;
+        const req = q * currentDetailLtp;
+        opRequired.textContent = '₹' + req.toLocaleString('en-IN');
+        opBalance.textContent = '₹' + PaperTrade.getBalance().toLocaleString('en-IN');
+        opActionBtn.textContent = orderSide === 'BUY' ? 'Buy' : 'Sell';
+        opActionBtn.style.background = orderSide === 'BUY' ? 'var(--green-primary)' : 'var(--red-primary)';
+        opTabBuy.className = 'op-tab' + (orderSide === 'BUY' ? ' active' : '');
+        opTabSell.className = 'op-tab' + (orderSide === 'SELL' ? ' active' : '');
+      }
+
+      opTabBuy.onclick = () => { orderSide = 'BUY'; updateOrderPanel(); };
+      opTabSell.onclick = () => { orderSide = 'SELL'; updateOrderPanel(); };
+      opQty.oninput = updateOrderPanel;
+
+      opActionBtn.onclick = () => {
+        const q = parseInt(opQty.value) || 0;
+        if (q <= 0) { toast('Enter a valid quantity'); return; }
+        let success;
+        if (orderSide === 'BUY') {
+          success = PaperTrade.buy(currentDetailSymbol, q, currentDetailLtp);
+        } else {
+          success = PaperTrade.sell(currentDetailSymbol, q, currentDetailLtp);
+        }
+        if (success) {
+          updateOrderPanel();
+          renderPortfolio();
+        }
+      };
+
+      updateOrderPanel();
 
       // Market Depth
       document.getElementById('depth-buy-pct').textContent = data.depth.buyOrdersPct + '%';
@@ -655,6 +791,113 @@
     }
   }
 
+  // ── Portfolio Tab Rendering ──
+  function renderPortfolio() {
+    const portfolio = PaperTrade.getPortfolio();
+    const orders = PaperTrade.getOrders();
+    const balance = PaperTrade.getBalance();
+    const symbols = Object.keys(portfolio);
+
+    // Update summary values
+    const portfolioBalanceEl = document.getElementById('portfolio-balance');
+    const portfolioValueEl = document.getElementById('portfolio-value');
+    const portfolioPnlEl = document.getElementById('portfolio-pnl');
+    const opBalanceEl = document.getElementById('op-balance');
+
+    if (portfolioBalanceEl) portfolioBalanceEl.textContent = '₹' + balance.toLocaleString('en-IN');
+    if (opBalanceEl) opBalanceEl.textContent = '₹' + balance.toLocaleString('en-IN');
+
+    // Build holdings table
+    const tbody = document.getElementById('portfolio-tbody');
+    const emptyEl = document.getElementById('portfolio-empty');
+    if (tbody) tbody.innerHTML = '';
+
+    if (symbols.length === 0) {
+      if (emptyEl) emptyEl.style.display = 'block';
+      if (portfolioValueEl) portfolioValueEl.textContent = '₹0';
+      if (portfolioPnlEl) { portfolioPnlEl.textContent = '₹0'; portfolioPnlEl.className = 'time-val'; }
+    } else {
+      if (emptyEl) emptyEl.style.display = 'none';
+      let totalValue = 0;
+      let totalInvested = 0;
+
+      symbols.forEach(sym => {
+        const h = portfolio[sym];
+        const stock = currentStocks.find(s => s.symbol === sym);
+        const currentPrice = stock ? stock.ltp : h.avgPrice;
+        const invested = h.avgPrice * h.qty;
+        const current = currentPrice * h.qty;
+        const pnl = current - invested;
+        const pnlPct = invested > 0 ? (pnl / invested * 100) : 0;
+        totalValue += current;
+        totalInvested += invested;
+
+        const initials = sym.substring(0, 2);
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.innerHTML = `
+          <td>
+            <div class="sym-col">
+              <div class="sym-icon">${initials}</div>
+              <div class="sym-name">${sym}</div>
+            </div>
+          </td>
+          <td class="right"><div class="val-price">₹${h.avgPrice.toLocaleString('en-IN', {minimumFractionDigits:2})}</div></td>
+          <td class="right">${h.qty}</td>
+          <td class="right">₹${invested.toLocaleString('en-IN')}</td>
+          <td class="right">₹${current.toLocaleString('en-IN')}</td>
+          <td class="right">
+            <div class="change-pill ${pnl >= 0 ? 'up' : 'down'}">
+              ${pnl >= 0 ? '+' : ''}₹${pnl.toLocaleString('en-IN', {minimumFractionDigits:0})} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%)
+            </div>
+          </td>
+          <td class="center">
+            <button class="icon-btn small" title="View Details" data-sym="${sym}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            </button>
+          </td>
+        `;
+        tr.addEventListener('click', () => openStockDetails(sym));
+        if (tbody) tbody.appendChild(tr);
+      });
+
+      const totalPnl = totalValue - totalInvested;
+      if (portfolioValueEl) portfolioValueEl.textContent = '₹' + totalValue.toLocaleString('en-IN');
+      if (portfolioPnlEl) {
+        portfolioPnlEl.textContent = (totalPnl >= 0 ? '+' : '') + '₹' + totalPnl.toLocaleString('en-IN');
+        portfolioPnlEl.className = 'time-val ' + (totalPnl >= 0 ? 'text-green' : 'text-red');
+      }
+    }
+
+    // Build orders table
+    const ordersTbody = document.getElementById('orders-tbody');
+    const ordersEmpty = document.getElementById('orders-empty');
+    if (ordersTbody) ordersTbody.innerHTML = '';
+
+    if (orders.length === 0) {
+      if (ordersEmpty) ordersEmpty.style.display = 'block';
+    } else {
+      if (ordersEmpty) ordersEmpty.style.display = 'none';
+      orders.slice(0, 50).forEach(o => {
+        const tr = document.createElement('tr');
+        const d = new Date(o.ts);
+        tr.innerHTML = `
+          <td><div class="text-updated">${d.toLocaleDateString('en-IN', {day:'numeric',month:'short'})} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div></td>
+          <td><strong>${o.symbol}</strong></td>
+          <td class="center">
+            <div class="attention-badge ${o.side === 'BUY' ? 'att-normal' : 'att-high'}" style="${o.side === 'BUY' ? 'background:var(--green-light);color:var(--green-primary)' : ''}">
+              ${o.side}
+            </div>
+          </td>
+          <td class="right">${o.qty}</td>
+          <td class="right">₹${o.price.toLocaleString('en-IN')}</td>
+          <td class="right">₹${o.total.toLocaleString('en-IN')}</td>
+        `;
+        if (ordersTbody) ordersTbody.appendChild(tr);
+      });
+    }
+  }
+
   // ── Tab Navigation ──
   function initTabs() {
     const navItems = document.querySelectorAll('.nav-menu .nav-item');
@@ -696,8 +939,23 @@
     const greetingEl = document.querySelector('.greeting');
     if (greetingEl) greetingEl.textContent = `${getGreeting()}, Manu`;
 
+    // Display last-visit time with relative label
+    const subtitleEl = document.querySelector('.subtitle');
     if (el.lblLast) el.lblLast.textContent = fmtTime(lastVisit);
     if (el.lblNow) el.lblNow.textContent = fmtTime(Date.now());
+    if (subtitleEl && lastVisit) {
+      const diff = Date.now() - lastVisit;
+      const mins = Math.floor(diff / 60000);
+      let awayStr;
+      if (mins < 1) awayStr = 'just now';
+      else if (mins < 60) awayStr = `${mins} min ago`;
+      else {
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) awayStr = `${hrs} hr${hrs > 1 ? 's' : ''} ago`;
+        else { const d = Math.floor(hrs/24); awayStr = `${d} day${d>1?'s':''} ago`; }
+      }
+      subtitleEl.textContent = `Here's what changed since your last visit (${awayStr}).`;
+    }
 
     function markAllSeen() {
       Detect.markSeen(currentStocks);
@@ -708,10 +966,25 @@
 
     if (el.btnSeen) el.btnSeen.addEventListener('click', markAllSeen);
 
+    // Portfolio reset
+    const resetBtn = document.getElementById('btn-reset-portfolio');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        if (confirm('Reset your paper portfolio? All holdings and orders will be cleared.')) {
+          PaperTrade.reset();
+          renderPortfolio();
+        }
+      });
+    }
+
     await refresh();
+    renderPortfolio();
 
     setInterval(async () => {
-      if (!document.hidden) await refresh();
+      if (!document.hidden) {
+        await refresh();
+        renderPortfolio();
+      }
     }, POLL);
 
     document.addEventListener('visibilitychange', async () => {
@@ -719,6 +992,7 @@
         autoSaveOnExit();
       } else {
         await refresh();
+        renderPortfolio();
       }
     });
 

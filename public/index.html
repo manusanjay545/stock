@@ -45,6 +45,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             News
           </a>
+          <a href="#" class="nav-item" data-tab="portfolio">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            Portfolio
+          </a>
           <a href="#" class="nav-item" data-tab="analytics">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             Analytics
@@ -433,45 +437,45 @@
             <div class="sd-right">
               <div class="order-panel">
                 <div class="op-header">
-                  <div class="op-title" id="op-title">Muthoot Finance</div>
-                  <div class="op-subtitle"><span id="op-sub-price">NSE ₹2,927.70 (+0.04%)</span> · BSE ₹2,927.20</div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div class="op-title" id="op-title">Muthoot Finance</div>
+                    <span class="badge" style="background:rgba(240,165,0,0.15);color:var(--orange-primary);font-size:0.6rem;">📝 PAPER</span>
+                  </div>
+                  <div class="op-subtitle"><span id="op-sub-price">NSE ₹2,927.70 (+0.04%)</span></div>
                 </div>
                 
                 <div class="op-tabs">
-                  <div class="op-tab active">BUY</div>
-                  <div class="op-tab">SELL</div>
+                  <div class="op-tab active" id="op-tab-buy">BUY</div>
+                  <div class="op-tab" id="op-tab-sell">SELL</div>
                 </div>
 
                 <div class="op-body">
                   <div class="op-type-toggles">
                     <button class="op-type-btn active">Delivery</button>
                     <button class="op-type-btn">Intraday</button>
-                    <button class="op-type-btn">MTF <span style="font-size:0.6rem">3.64x</span></button>
-                    <button class="op-type-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
                   </div>
 
                   <div class="op-row">
                     <div class="op-lbl">Qty <span class="op-ex">NSE</span></div>
                     <div class="op-input-wrap">
-                      <div class="op-qty-hint">7 | 11 | 18</div>
-                      <input type="number" class="op-input" value="1">
+                      <input type="number" class="op-input" id="op-qty" value="1" min="1">
                     </div>
                   </div>
 
                   <div class="op-row">
-                    <div class="op-lbl">Price <span class="op-ex">Market</span></div>
+                    <div class="op-lbl">Price <span class="op-ex" id="op-price-mode">Market</span></div>
                     <div class="op-input-wrap">
-                      <input type="text" class="op-input" value="At market" readonly style="color:var(--text-primary); text-align:right">
+                      <input type="text" class="op-input" id="op-price" value="At market" readonly style="color:var(--text-primary); text-align:right">
                     </div>
                   </div>
                 </div>
 
                 <div class="op-footer">
                   <div class="op-bal-row">
-                    <div class="op-bal">Balance : ₹30</div>
-                    <div class="op-req">Approx req. : <span style="border-bottom: 1px dashed var(--text-tertiary)">₹0</span></div>
+                    <div class="op-bal">Balance : <span id="op-balance">₹10,00,000</span></div>
+                    <div class="op-req">Approx req. : <span id="op-required" style="border-bottom: 1px dashed var(--text-tertiary)">₹0</span></div>
                   </div>
-                  <button class="op-action-btn">Buy</button>
+                  <button class="op-action-btn" id="op-action-btn">Buy</button>
                 </div>
               </div>
             </div>
@@ -499,6 +503,86 @@
             <h3>No recent news</h3>
             <p>We're actively monitoring the news feeds. Any major events affecting your stocks will appear here.</p>
           </div>
+        </div>
+
+        <!-- ── TAB: PORTFOLIO (Paper Trading) ── -->
+        <div id="tab-portfolio" class="tab-content">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+              <h1>Paper Portfolio <span class="badge" style="background:rgba(240,165,0,0.15);color:var(--orange-primary);font-size:0.65rem;vertical-align:middle;margin-left:6px;">📝 PAPER</span></h1>
+              <p class="subtitle">Practice trading with virtual ₹10,00,000. No real money involved.</p>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;">
+              <div class="time-box" style="text-align:right;">
+                <span class="time-label">Cash Balance</span>
+                <span class="time-val text-green" id="portfolio-balance">₹10,00,000</span>
+              </div>
+              <div class="time-box" style="text-align:right;">
+                <span class="time-label">Holdings Value</span>
+                <span class="time-val" id="portfolio-value">₹0</span>
+              </div>
+              <div class="time-box" style="text-align:right;">
+                <span class="time-label">Total P&L</span>
+                <span class="time-val" id="portfolio-pnl">₹0</span>
+              </div>
+            </div>
+          </div>
+
+          <section class="watchlist-section">
+            <div class="section-header">
+              <h2>Holdings</h2>
+              <button class="btn-text" id="btn-reset-portfolio">Reset Portfolio</button>
+            </div>
+            <div class="table-container">
+              <table class="wl-table">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th class="right">Avg. Price</th>
+                    <th class="right">Qty</th>
+                    <th class="right">Invested</th>
+                    <th class="right">Current</th>
+                    <th class="right">P&L</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="portfolio-tbody">
+                </tbody>
+              </table>
+              <div id="portfolio-empty" class="empty-state" style="display:none">
+                <div class="empty-icon">📦</div>
+                <h3>No holdings yet</h3>
+                <p>Search for a stock and place a paper trade to get started.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="watchlist-section">
+            <div class="section-header">
+              <h2>Order History</h2>
+            </div>
+            <div class="table-container">
+              <table class="wl-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Symbol</th>
+                    <th class="center">Side</th>
+                    <th class="right">Qty</th>
+                    <th class="right">Price</th>
+                    <th class="right">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="orders-tbody">
+                </tbody>
+              </table>
+              <div id="orders-empty" class="empty-state" style="display:none">
+                <div class="empty-icon">📝</div>
+                <h3>No orders yet</h3>
+                <p>Your paper trade history will appear here.</p>
+              </div>
+            </div>
+          </section>
         </div>
 
         <!-- ── TAB: ANALYTICS ── -->
