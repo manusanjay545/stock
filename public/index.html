@@ -133,9 +133,6 @@
           <section class="watchlist-section" id="overview-holdings-section" style="display:none;">
             <div class="section-header">
               <h2>📊 Your Holdings <span class="badge" style="background:rgba(240,165,0,0.15);color:var(--orange-primary);font-size:0.6rem;">PAPER</span></h2>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <button class="btn-text" id="btn-add-money">+ Add Money</button>
-              </div>
             </div>
             <!-- Holdings summary cards -->
             <div class="holdings-summary" id="overview-holdings-summary">
@@ -520,10 +517,7 @@
                     <div class="op-bal">Balance : <span id="op-balance">₹10,00,000</span></div>
                     <div class="op-req">Approx req. : <span id="op-required" style="border-bottom: 1px dashed var(--text-tertiary)">₹0</span></div>
                   </div>
-                  <div style="display:flex;gap:8px;">
-                    <button class="op-action-btn" id="op-action-btn" style="flex:1;">Buy</button>
-                    <button class="op-action-btn" id="op-add-money-btn" style="flex:0 0 auto;background:var(--blue-primary);padding:14px 20px;font-size:0.85rem;" title="Add virtual money">+ Add ₹</button>
-                  </div>
+                  <button class="op-action-btn" id="op-action-btn">Buy</button>
                 </div>
               </div>
             </div>
@@ -648,7 +642,27 @@
         <div id="tab-settings" class="tab-content">
           <h1>Settings</h1>
           <p class="subtitle">Manage your preferences and alerts.</p>
+          
+          <div class="settings-list" style="margin-bottom: 32px;">
+            <h2>Paper Trading</h2>
+            <div class="settings-item" style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div class="st-title">Add Virtual Funds</div>
+                <div class="st-desc">Top up your paper trading account balance to practice trading.</div>
+              </div>
+              <button class="icon-btn" id="settings-add-money" style="background:var(--green-primary);color:#000;border-radius:4px;padding:8px 16px;width:auto;">+ Add Funds</button>
+            </div>
+            <div class="settings-item" style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div class="st-title">Reset Portfolio</div>
+                <div class="st-desc">Clear all paper trading orders and reset balance.</div>
+              </div>
+              <button class="icon-btn" id="settings-reset-portfolio" style="background:var(--red-primary);color:#fff;border-radius:4px;padding:8px 16px;width:auto;">Reset</button>
+            </div>
+          </div>
+
           <div class="settings-list">
+            <h2>General</h2>
             <div class="settings-item">
               <div><strong>Dark Theme</strong><div style="font-size:0.8rem;color:var(--text-secondary)">Enable premium dark mode</div></div>
               <div class="toggle-switch active"></div>

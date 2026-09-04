@@ -559,12 +559,19 @@
 
   // ── Main Fetch & Refresh ──
   async function refresh() {
-    if (!watchlist.length) { renderTable([], {}); renderAlerts([]); return; }
+    const portfolio = PaperTrade.getPortfolio();
+    const allSymbols = [...new Set([...watchlist, ...Object.keys(portfolio)])];
+    
+    if (allSymbols.length === 0) { 
+      renderTable([], {}); 
+      renderAlerts([]); 
+      return; 
+    }
     
     try {
       const res = await fetch('/api/quotes', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbols: watchlist })
+        body: JSON.stringify({ symbols: allSymbols })
       });
       const data = await res.json();
       currentStocks = data.stocks.map(s => ({...s, lastUpdated: data.lastUpdated}));
@@ -573,6 +580,8 @@
       const alertsMap = {};
       
       currentStocks.forEach(s => {
+        if (!watchlist.includes(s.symbol)) return;
+
         if (!snapshots[s.symbol]) {
           snapshots[s.symbol] = { price: s.ltp, rsi: s.rsi, ts: Date.now() };
         }
@@ -588,7 +597,7 @@
       alerts.sort((a, b) => (levelOrder[a.level] ?? 3) - (levelOrder[b.level] ?? 3));
       
       renderAlerts(alerts);
-      renderTable(currentStocks, alertsMap);
+      renderTable(currentStocks.filter(s => watchlist.includes(s.symbol)), alertsMap);
       
       if (el.lblNow) el.lblNow.textContent = fmtTime(Date.now());
       
