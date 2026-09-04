@@ -284,8 +284,133 @@
       this.savePortfolio({});
       this.saveOrders([]);
       toast('Portfolio reset to ₹10,00,000');
+    },
+
+    addFunds(amount) {
+      let balance = this.getBalance();
+      balance += amount;
+      this.setBalance(balance);
+      toast(`₹${amount.toLocaleString('en-IN')} added to paper balance`);
     }
   };
+
+  // ── Add Money Modal ──
+  function showAddMoneyModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'add-money-overlay';
+    overlay.innerHTML = `
+      <div class="add-money-modal">
+        <h2>💰 Add Virtual Funds</h2>
+        <p>Top up your paper trading balance. This is not real money.</p>
+        <div class="add-money-presets">
+          <button class="preset-btn" data-amt="100000">₹1,00,000</button>
+          <button class="preset-btn" data-amt="500000">₹5,00,000</button>
+          <button class="preset-btn" data-amt="1000000">₹10,00,000</button>
+          <button class="preset-btn" data-amt="2500000">₹25,00,000</button>
+        </div>
+        <input type="number" class="add-money-input" id="add-money-amt" placeholder="Enter custom amount" min="1">
+        <div class="add-money-actions">
+          <button class="am-cancel" id="am-cancel">Cancel</button>
+          <button class="am-confirm" id="am-confirm">Add Funds</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const input = overlay.querySelector('#add-money-amt');
+    overlay.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        input.value = btn.dataset.amt;
+      });
+    });
+
+    overlay.querySelector('#am-cancel').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector('#am-confirm').addEventListener('click', () => {
+      const amt = parseInt(input.value);
+      if (!amt || amt <= 0) { toast('Enter a valid amount'); return; }
+      PaperTrade.addFunds(amt);
+      renderOverviewHoldings();
+      renderPortfolio();
+      overlay.remove();
+    });
+  }
+
+  // ── Overview Holdings Rendering ──
+  function renderOverviewHoldings() {
+    const portfolio = PaperTrade.getPortfolio();
+    const balance = PaperTrade.getBalance();
+    const symbols = Object.keys(portfolio);
+    const section = document.getElementById('overview-holdings-section');
+    const tbody = document.getElementById('ov-holdings-tbody');
+
+    if (symbols.length === 0 && balance === INITIAL_BALANCE) {
+      if (section) section.style.display = 'none';
+      return;
+    }
+    if (section) section.style.display = 'block';
+
+    // Update summary cards
+    const ovCash = document.getElementById('ov-cash');
+    const ovInvested = document.getElementById('ov-invested');
+    const ovCurrent = document.getElementById('ov-current');
+    const ovPnl = document.getElementById('ov-pnl');
+
+    if (ovCash) ovCash.textContent = '₹' + balance.toLocaleString('en-IN');
+
+    let totalInvested = 0;
+    let totalCurrent = 0;
+
+    if (tbody) tbody.innerHTML = '';
+
+    symbols.forEach(sym => {
+      const h = portfolio[sym];
+      const stock = currentStocks.find(s => s.symbol === sym);
+      const currentPrice = stock ? stock.ltp : h.avgPrice;
+      const invested = h.avgPrice * h.qty;
+      const current = currentPrice * h.qty;
+      const pnl = current - invested;
+      const pnlPct = invested > 0 ? (pnl / invested * 100) : 0;
+      totalInvested += invested;
+      totalCurrent += current;
+
+      if (tbody) {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.innerHTML = `
+          <td>
+            <div class="sym-col">
+              <div class="sym-icon">${sym.substring(0,2)}</div>
+              <div class="sym-name">${sym}</div>
+            </div>
+          </td>
+          <td class="right"><div class="val-price">₹${h.avgPrice.toLocaleString('en-IN', {minimumFractionDigits:2})}</div></td>
+          <td class="right">${h.qty}</td>
+          <td class="right">₹${current.toLocaleString('en-IN')}</td>
+          <td class="right">
+            <div class="change-pill ${pnl >= 0 ? 'up' : 'down'}">
+              ${pnl >= 0 ? '+' : ''}₹${pnl.toLocaleString('en-IN', {minimumFractionDigits:0})} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%)
+            </div>
+          </td>
+        `;
+        tr.addEventListener('click', () => openStockDetails(sym));
+        tbody.appendChild(tr);
+      }
+    });
+
+    const totalPnl = totalCurrent - totalInvested;
+    if (ovInvested) ovInvested.textContent = '₹' + totalInvested.toLocaleString('en-IN');
+    if (ovCurrent) ovCurrent.textContent = '₹' + totalCurrent.toLocaleString('en-IN');
+    if (ovPnl) {
+      ovPnl.textContent = (totalPnl >= 0 ? '+' : '') + '₹' + totalPnl.toLocaleString('en-IN');
+      ovPnl.className = 'hc-value ' + (totalPnl >= 0 ? 'text-green' : 'text-red');
+    }
+
+    // Also update the order panel balance display
+    const opBalanceEl = document.getElementById('op-balance');
+    if (opBalanceEl) opBalanceEl.textContent = '₹' + balance.toLocaleString('en-IN');
+  }
 
   // ── UI Rendering ──
   function renderAlerts(alerts) {
@@ -937,7 +1062,7 @@
     }
 
     const greetingEl = document.querySelector('.greeting');
-    if (greetingEl) greetingEl.textContent = `${getGreeting()}, Manu`;
+    if (greetingEl) greetingEl.textContent = `${getGreeting()}, Sir/Mam`;
 
     // Display last-visit time with relative label
     const subtitleEl = document.querySelector('.subtitle');
@@ -973,17 +1098,26 @@
         if (confirm('Reset your paper portfolio? All holdings and orders will be cleared.')) {
           PaperTrade.reset();
           renderPortfolio();
+          renderOverviewHoldings();
         }
       });
     }
 
+    // Add Money buttons
+    const addMoneyBtn = document.getElementById('btn-add-money');
+    if (addMoneyBtn) addMoneyBtn.addEventListener('click', showAddMoneyModal);
+    const opAddMoneyBtn = document.getElementById('op-add-money-btn');
+    if (opAddMoneyBtn) opAddMoneyBtn.addEventListener('click', showAddMoneyModal);
+
     await refresh();
     renderPortfolio();
+    renderOverviewHoldings();
 
     setInterval(async () => {
       if (!document.hidden) {
         await refresh();
         renderPortfolio();
+        renderOverviewHoldings();
       }
     }, POLL);
 
@@ -993,6 +1127,7 @@
       } else {
         await refresh();
         renderPortfolio();
+        renderOverviewHoldings();
       }
     });
 
