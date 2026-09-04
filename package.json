@@ -1,0 +1,21 @@
+{
+  "name": "groww-market-scanner",
+  "version": "1.0.0",
+  "description": "Top Gainers & Losers with RSI Scanner - Groww API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@google/genai": "^2.21.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "node-fetch": "^2.7.0",
+    "otpauth": "^9.5.1",
+    "technicalindicators": "^3.1.0"
+  }
+}
