@@ -500,6 +500,29 @@
       document.getElementById('tab-stock-details').classList.add('active');
       document.getElementById('tab-stock-details').style.display = 'block';
 
+      // Stock Details Watchlist button
+      const wlBtn = document.getElementById('btn-sd-wl');
+      if (wlBtn) {
+        wlBtn.onclick = () => {
+          if (watchlist.includes(symbol)) {
+            WL.remove(symbol);
+            wlBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+            wlBtn.title = "Add to Watchlist";
+          } else {
+            WL.add(symbol);
+            wlBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="var(--green-primary)" stroke="var(--green-primary)" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+            wlBtn.title = "Remove from Watchlist";
+          }
+        };
+        if (watchlist.includes(symbol)) {
+          wlBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="var(--green-primary)" stroke="var(--green-primary)" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+          wlBtn.title = "Remove from Watchlist";
+        } else {
+          wlBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+          wlBtn.title = "Add to Watchlist";
+        }
+      }
+
       // Ensure Overview tab works again when clicked
       document.querySelector('[data-tab="overview"]').addEventListener('click', () => {
          document.getElementById('tab-stock-details').style.display = 'none';
@@ -523,11 +546,14 @@
         const results = await res.json();
         el.dropdown.innerHTML = results.map(r => `
           <div class="search-item" data-sym="${r.symbol}">
-            <div>
+            <div style="flex: 1;">
               <strong>${r.symbol}</strong>
               <div style="font-size:0.7rem;color:var(--text-tertiary)">${r.sector}</div>
             </div>
-            ${r.ltp ? `<div class="${r.changePct>=0?'text-green':'text-red'}">₹${r.ltp}</div>` : ''}
+            ${r.ltp ? `<div class="${r.changePct>=0?'text-green':'text-red'}" style="margin-right: 10px;">₹${r.ltp}</div>` : ''}
+            <button class="icon-btn small btn-add-search" data-sym="${r.symbol}" title="Add to Watchlist">
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
           </div>
         `).join('');
         el.dropdown.style.display = 'block';
@@ -535,11 +561,19 @@
     });
     
     el.dropdown.addEventListener('click', e => {
+      const addBtn = e.target.closest('.btn-add-search');
+      if (addBtn) {
+        e.stopPropagation();
+        if (!watchlist.includes(addBtn.dataset.sym)) {
+          WL.add(addBtn.dataset.sym);
+        } else {
+          toast(`${addBtn.dataset.sym} is already in your watchlist`);
+        }
+        return;
+      }
+
       const item = e.target.closest('.search-item');
       if (item) {
-        if (!watchlist.includes(item.dataset.sym)) {
-          WL.add(item.dataset.sym);
-        }
         openStockDetails(item.dataset.sym);
         el.search.value = '';
         el.dropdown.style.display = 'none';
@@ -643,6 +677,21 @@
   async function init() {
     initSearch();
     initTabs();
+
+    const mobileAiToggle = document.getElementById('mobile-ai-toggle');
+    const mobileAiClose = document.getElementById('mobile-ai-close');
+    const aiPanel = document.querySelector('.ai-panel');
+
+    if (mobileAiToggle && aiPanel) {
+      mobileAiToggle.addEventListener('click', () => {
+        aiPanel.classList.add('open');
+      });
+    }
+    if (mobileAiClose && aiPanel) {
+      mobileAiClose.addEventListener('click', () => {
+        aiPanel.classList.remove('open');
+      });
+    }
 
     const greetingEl = document.querySelector('.greeting');
     if (greetingEl) greetingEl.textContent = `${getGreeting()}, Manu`;
