@@ -1083,7 +1083,10 @@
       item.addEventListener('click', (e) => {
         e.preventDefault();
         navItems.forEach(nav => nav.classList.remove('active'));
-        tabContents.forEach(tab => tab.classList.remove('active'));
+        tabContents.forEach(tab => {
+          tab.classList.remove('active');
+          tab.style.display = ''; // clear any inline display overrides
+        });
         item.classList.add('active');
         const targetTabId = 'tab-' + item.dataset.tab;
         const targetTab = document.getElementById(targetTabId);
