@@ -636,6 +636,15 @@
       const opActionBtn = document.getElementById('op-action-btn');
       const opTabBuy = document.getElementById('op-tab-buy');
       const opTabSell = document.getElementById('op-tab-sell');
+      const opAvailRow = document.getElementById('op-avail-row');
+      const opAvailQty = document.getElementById('op-avail-qty');
+      const opPnlRow = document.getElementById('op-pnl-row');
+      const opEstPnl = document.getElementById('op-est-pnl');
+
+      function getHolding(sym) {
+        const p = PaperTrade.getPortfolio();
+        return p[sym] || null;
+      }
 
       function updateOrderPanel() {
         const q = parseInt(opQty.value) || 0;
@@ -646,10 +655,37 @@
         opActionBtn.style.background = orderSide === 'BUY' ? 'var(--green-primary)' : 'var(--red-primary)';
         opTabBuy.className = 'op-tab' + (orderSide === 'BUY' ? ' active' : '');
         opTabSell.className = 'op-tab' + (orderSide === 'SELL' ? ' active' : '');
+
+        const holding = getHolding(currentDetailSymbol);
+
+        if (orderSide === 'SELL') {
+          const availShares = holding ? holding.qty : 0;
+          opAvailRow.style.display = 'flex';
+          opAvailQty.textContent = availShares + ' shares';
+
+          // Show estimated P&L for the sell qty
+          if (holding && q > 0) {
+            const sellPnl = (currentDetailLtp - holding.avgPrice) * Math.min(q, availShares);
+            opPnlRow.style.display = 'flex';
+            opEstPnl.textContent = (sellPnl >= 0 ? '+' : '') + '₹' + sellPnl.toLocaleString('en-IN', {minimumFractionDigits: 2});
+            opEstPnl.style.color = sellPnl >= 0 ? 'var(--green-primary)' : 'var(--red-primary)';
+          } else {
+            opPnlRow.style.display = 'none';
+          }
+
+          // Cap max qty to available
+          if (opQty.max !== String(availShares)) {
+            opQty.max = availShares;
+          }
+        } else {
+          opAvailRow.style.display = 'none';
+          opPnlRow.style.display = 'none';
+          opQty.removeAttribute('max');
+        }
       }
 
-      opTabBuy.onclick = () => { orderSide = 'BUY'; updateOrderPanel(); };
-      opTabSell.onclick = () => { orderSide = 'SELL'; updateOrderPanel(); };
+      opTabBuy.onclick = () => { orderSide = 'BUY'; opQty.value = 1; updateOrderPanel(); };
+      opTabSell.onclick = () => { orderSide = 'SELL'; opQty.value = 1; updateOrderPanel(); };
       opQty.oninput = updateOrderPanel;
 
       opActionBtn.onclick = () => {
@@ -659,11 +695,17 @@
         if (orderSide === 'BUY') {
           success = PaperTrade.buy(currentDetailSymbol, q, currentDetailLtp);
         } else {
+          const holding = getHolding(currentDetailSymbol);
+          if (!holding || q > holding.qty) {
+            toast(`You only hold ${holding ? holding.qty : 0} shares of ${currentDetailSymbol}`);
+            return;
+          }
           success = PaperTrade.sell(currentDetailSymbol, q, currentDetailLtp);
         }
         if (success) {
           updateOrderPanel();
           renderPortfolio();
+          renderOverviewHoldings();
         }
       };
 
@@ -1100,7 +1142,7 @@
 
     if (el.btnSeen) el.btnSeen.addEventListener('click', markAllSeen);
 
-    // Portfolio reset
+    // Portfolio reset (portfolio tab)
     const resetBtn = document.getElementById('btn-reset-portfolio');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
@@ -1112,11 +1154,20 @@
       });
     }
 
-    // Add Money buttons
-    const addMoneyBtn = document.getElementById('btn-add-money');
-    if (addMoneyBtn) addMoneyBtn.addEventListener('click', showAddMoneyModal);
-    const opAddMoneyBtn = document.getElementById('op-add-money-btn');
-    if (opAddMoneyBtn) opAddMoneyBtn.addEventListener('click', showAddMoneyModal);
+    // Settings page: Add Funds + Reset Portfolio
+    const settingsAddMoney = document.getElementById('settings-add-money');
+    if (settingsAddMoney) settingsAddMoney.addEventListener('click', showAddMoneyModal);
+
+    const settingsReset = document.getElementById('settings-reset-portfolio');
+    if (settingsReset) {
+      settingsReset.addEventListener('click', () => {
+        if (confirm('Reset your paper portfolio? All holdings and orders will be cleared.')) {
+          PaperTrade.reset();
+          renderPortfolio();
+          renderOverviewHoldings();
+        }
+      });
+    }
 
     await refresh();
     renderPortfolio();
