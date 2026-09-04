@@ -484,8 +484,8 @@
 
                 <div class="op-body">
                   <div class="op-type-toggles">
-                    <button class="op-type-btn active">Delivery</button>
-                    <button class="op-type-btn">Intraday</button>
+                    <button class="op-type-btn active" id="op-type-market">Market</button>
+                    <button class="op-type-btn" id="op-type-limit">Limit</button>
                   </div>
 
                   <div class="op-row">
@@ -508,7 +508,7 @@
                   <div class="op-row">
                     <div class="op-lbl">Price <span class="op-ex" id="op-price-mode">Market</span></div>
                     <div class="op-input-wrap">
-                      <input type="text" class="op-input" id="op-price" value="At market" readonly style="color:var(--text-primary); text-align:right">
+                      <input type="number" class="op-input" id="op-price" step="0.05" style="color:var(--text-primary); text-align:right" disabled>
                     </div>
                   </div>
                 </div>
@@ -611,9 +611,12 @@
                     <th>Time</th>
                     <th>Symbol</th>
                     <th class="center">Side</th>
+                    <th class="center">Type</th>
                     <th class="right">Qty</th>
                     <th class="right">Price</th>
                     <th class="right">Total</th>
+                    <th class="center">Status</th>
+                    <th class="center">Action</th>
                   </tr>
                 </thead>
                 <tbody id="orders-tbody">

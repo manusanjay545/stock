@@ -225,58 +225,106 @@
       localStorage.setItem(KEY_ORDERS, JSON.stringify(o));
     },
 
-    buy(symbol, qty, price) {
+    placeOrder({ symbol, side, qty, price, type = 'MARKET' }) {
       const total = qty * price;
       let balance = this.getBalance();
-      if (total > balance) {
-        toast('Insufficient paper balance!');
-        return false;
-      }
-      balance -= total;
-      this.setBalance(balance);
-
       const portfolio = this.getPortfolio();
-      if (portfolio[symbol]) {
-        const h = portfolio[symbol];
-        const newQty = h.qty + qty;
-        h.avgPrice = ((h.avgPrice * h.qty) + (price * qty)) / newQty;
-        h.qty = newQty;
+
+      if (side === 'BUY') {
+        if (total > balance) { toast('Insufficient paper balance!'); return false; }
+        // Lock funds
+        balance -= total;
+        this.setBalance(balance);
       } else {
-        portfolio[symbol] = { qty, avgPrice: price };
+        if (!portfolio[symbol] || portfolio[symbol].qty < qty) { toast('You don\'t hold enough shares to sell!'); return false; }
+        // Lock shares
+        portfolio[symbol].qty -= qty;
+        if (portfolio[symbol].qty <= 0) delete portfolio[symbol];
+        this.savePortfolio(portfolio);
       }
-      this.savePortfolio(portfolio);
 
       const orders = this.getOrders();
-      orders.unshift({ ts: Date.now(), symbol, side: 'BUY', qty, price, total });
+      const order = { id: Date.now().toString(), ts: Date.now(), symbol, side, qty, price, total, type, status: type === 'MARKET' ? 'EXECUTED' : 'PENDING' };
+      orders.unshift(order);
       this.saveOrders(orders);
 
-      toast(`📗 Paper BUY: ${qty} × ${symbol} @ ₹${price.toLocaleString('en-IN')}`);
+      if (type === 'MARKET') {
+        this._executeInternal(order, portfolio); 
+        toast(`${side === 'BUY' ? '📗' : '📕'} Paper ${side}: ${qty} × ${symbol} @ ₹${price.toLocaleString('en-IN')}`);
+      } else {
+        toast(`⏳ Limit ${side} placed: ${qty} × ${symbol} @ ₹${price.toLocaleString('en-IN')}`);
+      }
       return true;
     },
 
-    sell(symbol, qty, price) {
-      const portfolio = this.getPortfolio();
-      if (!portfolio[symbol] || portfolio[symbol].qty < qty) {
-        toast('You don\'t hold enough shares to sell!');
-        return false;
+    _executeInternal(order, portfolio) {
+      if (order.side === 'BUY') {
+        if (!portfolio[order.symbol]) portfolio[order.symbol] = { qty: 0, avgPrice: 0 };
+        const h = portfolio[order.symbol];
+        const newQty = h.qty + order.qty;
+        h.avgPrice = ((h.avgPrice * h.qty) + (order.price * order.qty)) / newQty;
+        h.qty = newQty;
+        this.savePortfolio(portfolio);
+      } else {
+        // For SELL: shares were already deducted in placeOrder, just credit the balance
+        let balance = this.getBalance();
+        balance += order.total;
+        this.setBalance(balance);
       }
-      const total = qty * price;
-      let balance = this.getBalance();
-      balance += total;
-      this.setBalance(balance);
+    },
 
-      portfolio[symbol].qty -= qty;
-      if (portfolio[symbol].qty <= 0) {
-        delete portfolio[symbol];
-      }
-      this.savePortfolio(portfolio);
-
+    cancelOrder(orderId) {
       const orders = this.getOrders();
-      orders.unshift({ ts: Date.now(), symbol, side: 'SELL', qty, price, total });
+      const orderIdx = orders.findIndex(o => o.id === orderId && o.status === 'PENDING');
+      if (orderIdx === -1) return false;
+
+      const order = orders[orderIdx];
+      order.status = 'CANCELLED';
       this.saveOrders(orders);
 
-      toast(`📕 Paper SELL: ${qty} × ${symbol} @ ₹${price.toLocaleString('en-IN')}`);
+      if (order.side === 'BUY') {
+        let balance = this.getBalance();
+        balance += order.total;
+        this.setBalance(balance);
+      } else {
+        const portfolio = this.getPortfolio();
+        if (!portfolio[order.symbol]) portfolio[order.symbol] = { qty: 0, avgPrice: 0 };
+        portfolio[order.symbol].qty += order.qty;
+        // avgPrice stays 0 if they didn't hold any? It should be handled by not changing avgPrice on cancellation of sell.
+        this.savePortfolio(portfolio);
+      }
+      toast(`Order cancelled and assets refunded`);
       return true;
+    },
+
+    processPending(livePrices) {
+      const orders = this.getOrders();
+      let changed = false;
+      const portfolio = this.getPortfolio();
+
+      orders.forEach(o => {
+        if (o.status !== 'PENDING') return;
+        const ltp = livePrices[o.symbol];
+        if (!ltp) return;
+
+        if (o.side === 'BUY' && ltp <= o.price) {
+          o.status = 'EXECUTED';
+          this._executeInternal(o, portfolio);
+          changed = true;
+          toast(`📗 Limit BUY Executed: ${o.qty} × ${o.symbol} @ ₹${o.price.toLocaleString('en-IN')}`);
+        } else if (o.side === 'SELL' && ltp >= o.price) {
+          o.status = 'EXECUTED';
+          this._executeInternal(o, portfolio);
+          changed = true;
+          toast(`📕 Limit SELL Executed: ${o.qty} × ${o.symbol} @ ₹${o.price.toLocaleString('en-IN')}`);
+        }
+      });
+
+      if (changed) {
+        this.saveOrders(orders);
+        if (typeof renderPortfolio === 'function') renderPortfolio();
+        if (typeof renderOverviewHoldings === 'function') renderOverviewHoldings();
+      }
     },
 
     reset() {
@@ -556,7 +604,8 @@
   // ── Main Fetch & Refresh ──
   async function refresh() {
     const portfolio = PaperTrade.getPortfolio();
-    const allSymbols = [...new Set([...watchlist, ...Object.keys(portfolio)])];
+    const pendingSymbols = PaperTrade.getOrders().filter(o => o.status === 'PENDING').map(o => o.symbol);
+    const allSymbols = [...new Set([...watchlist, ...Object.keys(portfolio), ...pendingSymbols])];
     
     if (allSymbols.length === 0) { 
       renderTable([], {}); 
@@ -571,6 +620,10 @@
       });
       const data = await res.json();
       currentStocks = data.stocks.map(s => ({...s, lastUpdated: data.lastUpdated}));
+      
+      const livePrices = {};
+      currentStocks.forEach(s => { livePrices[s.symbol] = s.ltp; });
+      PaperTrade.processPending(livePrices);
       
       const alerts = [];
       const alertsMap = {};
@@ -623,15 +676,20 @@
       // Save current detail context for order panel
       currentDetailSymbol = data.symbol;
       currentDetailLtp = data.ltp;
-      orderSide = 'BUY';
+      let orderSide = 'BUY';
+      let orderType = 'MARKET';
 
       // Wire order panel
       const opQty = document.getElementById('op-qty');
+      const opPrice = document.getElementById('op-price');
+      const opPriceMode = document.getElementById('op-price-mode');
       const opBalance = document.getElementById('op-balance');
       const opRequired = document.getElementById('op-required');
       const opActionBtn = document.getElementById('op-action-btn');
       const opTabBuy = document.getElementById('op-tab-buy');
       const opTabSell = document.getElementById('op-tab-sell');
+      const opTypeMarket = document.getElementById('op-type-market');
+      const opTypeLimit = document.getElementById('op-type-limit');
       const opAvailRow = document.getElementById('op-avail-row');
       const opAvailQty = document.getElementById('op-avail-qty');
       const opPnlRow = document.getElementById('op-pnl-row');
@@ -644,13 +702,37 @@
 
       function updateOrderPanel() {
         const q = parseInt(opQty.value) || 0;
-        const req = q * currentDetailLtp;
+        
+        let activePrice = currentDetailLtp;
+        if (orderType === 'LIMIT') {
+          opPrice.disabled = false;
+          opPrice.readOnly = false;
+          opPrice.style.opacity = '1';
+          opPriceMode.textContent = 'Limit';
+          if (opPrice.value !== '' && !isNaN(parseFloat(opPrice.value))) {
+            activePrice = parseFloat(opPrice.value) || 0;
+          } else {
+            opPrice.value = currentDetailLtp;
+          }
+        } else {
+          opPrice.disabled = true;
+          opPrice.readOnly = true;
+          opPrice.value = currentDetailLtp;
+          opPrice.style.opacity = '0.5';
+          opPriceMode.textContent = 'Market';
+        }
+
+        const req = q * activePrice;
         opRequired.textContent = '₹' + req.toLocaleString('en-IN');
         opBalance.textContent = '₹' + PaperTrade.getBalance().toLocaleString('en-IN');
         opActionBtn.textContent = orderSide === 'BUY' ? 'Buy' : 'Sell';
         opActionBtn.style.background = orderSide === 'BUY' ? 'var(--green-primary)' : 'var(--red-primary)';
+        
         opTabBuy.className = 'op-tab' + (orderSide === 'BUY' ? ' active' : '');
         opTabSell.className = 'op-tab' + (orderSide === 'SELL' ? ' active' : '');
+        
+        opTypeMarket.className = 'op-type-btn' + (orderType === 'MARKET' ? ' active' : '');
+        opTypeLimit.className = 'op-type-btn' + (orderType === 'LIMIT' ? ' active' : '');
 
         const holding = getHolding(currentDetailSymbol);
 
@@ -659,9 +741,9 @@
           opAvailRow.style.display = 'flex';
           opAvailQty.textContent = availShares + ' shares';
 
-          // Show estimated P&L for the sell qty
+          // Show estimated P&L for the sell qty based on activePrice
           if (holding && q > 0) {
-            const sellPnl = (currentDetailLtp - holding.avgPrice) * Math.min(q, availShares);
+            const sellPnl = (activePrice - holding.avgPrice) * Math.min(q, availShares);
             opPnlRow.style.display = 'flex';
             opEstPnl.textContent = (sellPnl >= 0 ? '+' : '') + '₹' + sellPnl.toLocaleString('en-IN', {minimumFractionDigits: 2});
             opEstPnl.style.color = sellPnl >= 0 ? 'var(--green-primary)' : 'var(--red-primary)';
@@ -682,23 +764,33 @@
 
       opTabBuy.onclick = () => { orderSide = 'BUY'; opQty.value = 1; updateOrderPanel(); };
       opTabSell.onclick = () => { orderSide = 'SELL'; opQty.value = 1; updateOrderPanel(); };
+      opTypeMarket.onclick = () => { orderType = 'MARKET'; updateOrderPanel(); };
+      opTypeLimit.onclick = () => { orderType = 'LIMIT'; updateOrderPanel(); };
       opQty.oninput = updateOrderPanel;
+      opPrice.oninput = updateOrderPanel;
 
       opActionBtn.onclick = () => {
         const q = parseInt(opQty.value) || 0;
         if (q <= 0) { toast('Enter a valid quantity'); return; }
-        let success;
-        if (orderSide === 'BUY') {
-          success = PaperTrade.buy(currentDetailSymbol, q, currentDetailLtp);
-        } else {
-          const holding = getHolding(currentDetailSymbol);
-          if (!holding || q > holding.qty) {
-            toast(`You only hold ${holding ? holding.qty : 0} shares of ${currentDetailSymbol}`);
-            return;
-          }
-          success = PaperTrade.sell(currentDetailSymbol, q, currentDetailLtp);
+        
+        let price = currentDetailLtp;
+        if (orderType === 'LIMIT') {
+          price = parseFloat(opPrice.value) || 0;
+          if (price <= 0) { toast('Enter a valid limit price'); return; }
         }
+
+        const success = PaperTrade.placeOrder({
+          symbol: currentDetailSymbol,
+          side: orderSide,
+          qty: q,
+          price: price,
+          type: orderType
+        });
+
         if (success) {
+          if (orderType === 'LIMIT') {
+            orderType = 'MARKET'; // reset to market after placing limit
+          }
           updateOrderPanel();
           renderPortfolio();
           renderOverviewHoldings();
@@ -1053,6 +1145,23 @@
       orders.slice(0, 50).forEach(o => {
         const tr = document.createElement('tr');
         const d = new Date(o.ts);
+        const orderType = o.type || 'MARKET';
+        const orderStatus = o.status || 'EXECUTED';
+
+        // Status badge colors
+        let statusClass = '';
+        let statusStyle = '';
+        if (orderStatus === 'PENDING') {
+          statusClass = 'att-watch';
+          statusStyle = 'background:rgba(255,193,7,0.15);color:#ffc107';
+        } else if (orderStatus === 'EXECUTED') {
+          statusClass = 'att-normal';
+          statusStyle = 'background:var(--green-light);color:var(--green-primary)';
+        } else if (orderStatus === 'CANCELLED') {
+          statusClass = 'att-high';
+          statusStyle = 'background:rgba(255,255,255,0.05);color:var(--text-tertiary)';
+        }
+
         tr.innerHTML = `
           <td><div class="text-updated">${d.toLocaleDateString('en-IN', {day:'numeric',month:'short'})} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div></td>
           <td><strong>${o.symbol}</strong></td>
@@ -1061,11 +1170,36 @@
               ${o.side}
             </div>
           </td>
+          <td class="center">
+            <div class="attention-badge" style="background:rgba(255,255,255,0.06);color:var(--text-secondary);font-size:0.65rem;">
+              ${orderType}
+            </div>
+          </td>
           <td class="right">${o.qty}</td>
           <td class="right">₹${o.price.toLocaleString('en-IN')}</td>
           <td class="right">₹${o.total.toLocaleString('en-IN')}</td>
+          <td class="center">
+            <div class="attention-badge ${statusClass}" style="${statusStyle}">
+              ${orderStatus}
+            </div>
+          </td>
+          <td class="center">
+            ${orderStatus === 'PENDING' ? `<button class="btn-cancel-order icon-btn small" data-order-id="${o.id}" title="Cancel Order" style="color:var(--red-primary);border:1px solid var(--red-primary);border-radius:6px;padding:4px 10px;font-size:0.7rem;cursor:pointer;background:transparent;">✕ Cancel</button>` : '—'}
+          </td>
         `;
         if (ordersTbody) ordersTbody.appendChild(tr);
+      });
+
+      // Wire cancel buttons
+      document.querySelectorAll('.btn-cancel-order').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const orderId = btn.dataset.orderId;
+          if (PaperTrade.cancelOrder(orderId)) {
+            renderPortfolio();
+            renderOverviewHoldings();
+          }
+        });
       });
     }
   }
