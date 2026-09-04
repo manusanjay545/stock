@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════
-//  MarketPulse AI — Core Application Logic (Dark Theme + Auto Change Detection)
+//  MarketPulse AI — Core Application Logic
+//  Unified Overview Dashboard with Change Detection
 // ═══════════════════════════════════════════════════════
 
 (function () {
@@ -9,46 +10,32 @@
   const DEBOUNCE = 200;
   const TOAST_MS = 3000;
 
-  // Change thresholds (percentage)
-  const THRESHOLD_MINOR = 1;   // 1-3%: informational
-  const THRESHOLD_WATCH = 3;   // 3-5%: watch level
-  const THRESHOLD_HIGH  = 5;   // 5%+: high attention
+  const THRESHOLD_MINOR = 1;
+  const THRESHOLD_WATCH = 3;
+  const THRESHOLD_HIGH  = 5;
 
   const KEY_WL = 'mp_watchlist';
   const KEY_SNAP = 'mp_snapshots';
   const KEY_LAST = 'mp_last_visit';
 
-  // State
-  let watchlist = JSON.parse(localStorage.getItem(KEY_WL) || '["RELIANCE","TCS","HDFCBANK"]');
+  let watchlist = JSON.parse(localStorage.getItem(KEY_WL) || '["RELIANCE","TCS","HDFCBANK","INFY","ITC"]');
   let snapshots = JSON.parse(localStorage.getItem(KEY_SNAP) || '{}');
   let lastVisit = parseInt(localStorage.getItem(KEY_LAST)) || Date.now();
   let currentStocks = [];
   let hasUnseen = false;
 
-  // Elements
   const el = {
     search: document.getElementById('search-input'),
     dropdown: document.getElementById('search-dropdown'),
-    
     lblLast: document.getElementById('val-last-checked'),
     lblNow: document.getElementById('val-now'),
     statMean: document.getElementById('stat-meaningful'),
     statAttn: document.getElementById('stat-attention'),
-    
     alertsCont: document.getElementById('alerts-container'),
     alertsEmpty: document.getElementById('alerts-empty'),
-    
     wlBody: document.getElementById('wl-tbody'),
     wlEmpty: document.getElementById('wl-empty'),
     btnSeen: document.getElementById('btn-mark-seen'),
-    
-    // Change banner
-    changeBanner: document.getElementById('change-banner'),
-    bannerTitle: document.getElementById('banner-title'),
-    bannerSub: document.getElementById('banner-sub'),
-    bannerDismiss: document.getElementById('banner-dismiss'),
-    
-    // AI Panel
     aiForm: document.getElementById('ai-chat-form'),
     aiInput: document.getElementById('ai-input'),
     chatHistory: document.getElementById('chat-history'),
@@ -56,7 +43,6 @@
     orbTitle: document.getElementById('orb-title'),
     orbSub: document.getElementById('orb-subtitle'),
     aiChecklist: document.getElementById('ai-checklist'),
-    
     toasts: document.getElementById('toasts')
   };
 
@@ -90,7 +76,6 @@
     return `${days} day${days > 1 ? 's' : ''} ago`;
   }
 
-  // ── Greeting based on time of day ──
   function getGreeting() {
     const hr = new Date().getHours();
     if (hr < 12) return 'Good morning';
@@ -125,10 +110,9 @@
     updateVisit() {
       lastVisit = Date.now();
       localStorage.setItem(KEY_LAST, lastVisit.toString());
-      el.lblLast.textContent = fmtTime(lastVisit);
+      if (el.lblLast) el.lblLast.textContent = fmtTime(lastVisit);
     },
 
-    // Save current prices as snapshot (called on exit)
     saveExitSnapshot(stocks) {
       if (!stocks || !stocks.length) return;
       stocks.forEach(s => {
@@ -147,7 +131,6 @@
       this.saveSnap();
       this.updateVisit();
       hasUnseen = false;
-      hideBanner();
     },
 
     analyze(stock) {
@@ -159,82 +142,59 @@
       const rsiOld = snap.rsi || 50;
       
       const reasons = [];
-      let level = 'normal'; // normal, minor, watch, high
+      let level = 'normal';
       
-      // Price thresholds
       if (Math.abs(pDiff) >= THRESHOLD_HIGH) {
         level = 'high';
         reasons.push({
-          icon: pDiff > 0 ? '📈' : '📉',
           color: pDiff > 0 ? 'green' : 'red',
-          text: `Price moved significantly (${pDiff > 0 ? '+' : ''}${pDiff.toFixed(1)}%)`
+          text: `Price moved significantly`
         });
       } else if (Math.abs(pDiff) >= THRESHOLD_WATCH) {
         level = 'watch';
         reasons.push({
-          icon: pDiff > 0 ? '↗' : '↘',
           color: pDiff > 0 ? 'green' : 'red',
-          text: `Price shifted (${pDiff > 0 ? '+' : ''}${pDiff.toFixed(1)}%)`
+          text: `Price ${pDiff > 0 ? 'increased' : 'fell'} notably`
         });
       } else if (Math.abs(pDiff) >= THRESHOLD_MINOR) {
         level = 'minor';
         reasons.push({
-          icon: pDiff > 0 ? '▲' : '▼',
           color: pDiff > 0 ? 'green' : 'red',
           text: `Price changed (${pDiff > 0 ? '+' : ''}${pDiff.toFixed(1)}%)`
         });
       }
 
-      // RSI zone transitions
       if (rsiNow > 70 && rsiOld <= 70) {
         level = level === 'normal' ? 'watch' : level;
-        reasons.push({ icon: '🔥', color: 'red', text: `Entered overbought zone (RSI ${rsiNow.toFixed(0)})` });
+        reasons.push({ color: 'red', text: `Entered overbought zone (RSI ${rsiNow.toFixed(0)})` });
       }
       if (rsiNow < 30 && rsiOld >= 30) {
         level = level === 'normal' ? 'watch' : level;
-        reasons.push({ icon: '🧊', color: 'green', text: `Entered oversold zone (RSI ${rsiNow.toFixed(0)})` });
+        reasons.push({ color: 'green', text: `Entered oversold zone (RSI ${rsiNow.toFixed(0)})` });
       }
       
-      // 30-day high break
       if (stock.yHigh && stock.ltp > stock.yHigh && snap.price <= stock.yHigh) {
         level = level === 'normal' || level === 'minor' ? 'watch' : level;
-        reasons.push({ icon: '⭐', color: 'green', text: 'Broke 30-day high' });
+        reasons.push({ color: 'green', text: 'New 30-day high' });
       }
-
-      // 30-day low break
       if (stock.yLow && stock.ltp < stock.yLow && snap.price >= stock.yLow) {
         level = level === 'normal' || level === 'minor' ? 'watch' : level;
-        reasons.push({ icon: '⚠️', color: 'red', text: 'Broke 30-day low' });
+        reasons.push({ color: 'red', text: 'Broke 30-day low' });
+      }
+
+      // Add some extra context reasons for richer cards
+      if (Math.abs(pDiff) >= THRESHOLD_MINOR) {
+        if (stock.volume && stock.avgVolume && stock.volume > stock.avgVolume * 1.5) {
+          reasons.push({ color: 'orange', text: `Volume ${(stock.volume / stock.avgVolume).toFixed(1)}x normal` });
+        } else {
+          reasons.push({ color: 'green', text: 'Volume within normal range' });
+        }
       }
 
       if (reasons.length === 0) return null;
       return { level, reasons, diff: pDiff };
     }
   };
-
-  // ── Banner Control ──
-  function showBanner(alerts) {
-    if (!alerts.length) { hideBanner(); return; }
-    
-    const highCount = alerts.filter(a => a.level === 'high').length;
-    const watchCount = alerts.filter(a => a.level === 'watch').length;
-    const minorCount = alerts.filter(a => a.level === 'minor').length;
-    const total = alerts.length;
-    
-    const parts = [];
-    if (highCount) parts.push(`${highCount} need attention`);
-    if (watchCount) parts.push(`${watchCount} to watch`);
-    if (minorCount) parts.push(`${minorCount} minor`);
-    
-    el.bannerTitle.textContent = `${total} stock${total > 1 ? 's' : ''} changed since your last visit`;
-    el.bannerSub.textContent = `Last checked ${timeSinceVisit()} · ${parts.join(', ')}`;
-    el.changeBanner.classList.add('visible');
-    hasUnseen = true;
-  }
-
-  function hideBanner() {
-    el.changeBanner.classList.remove('visible');
-  }
 
   // ── UI Rendering ──
   function renderAlerts(alerts) {
@@ -261,16 +221,18 @@
         minor: 'Info'
       }[a.level] || 'Normal';
 
+      const initials = a.stock.symbol.substring(0, 2);
+
       const html = `
         <div class="alert-card ${a.level}" style="animation-delay: ${i * 0.08}s">
           <div class="ac-header">
-            <div>
-              <div class="ac-sym">${a.stock.symbol}</div>
-              <div class="ac-price ${a.diff > 0 ? 'text-green' : 'text-red'}">
-                ${a.diff > 0 ? '+' : ''}${a.diff.toFixed(1)}%
-                <span style="font-size:0.8rem;font-weight:400;color:var(--text-secondary);margin-left:4px">
-                  ₹${a.stock.ltp ? a.stock.ltp.toLocaleString('en-IN') : '--'}
-                </span>
+            <div class="ac-top-left">
+              <div class="ac-logo">${initials}</div>
+              <div>
+                <div class="ac-sym">${a.stock.symbol}</div>
+                <div class="ac-price ${a.diff > 0 ? 'text-green' : 'text-red'}">
+                  ${a.diff > 0 ? '+' : ''}${a.diff.toFixed(1)}%
+                </div>
               </div>
             </div>
             <div class="badge ${a.level}">${levelLabel}</div>
@@ -278,7 +240,7 @@
           <div class="ac-reasons">
             ${a.reasons.map(r => `
               <div class="ac-reason">
-                <span class="ac-icon icon-${r.color}">${r.icon}</span>
+                <div class="ac-check ${r.color}">✓</div>
                 <span>${r.text}</span>
               </div>
             `).join('')}
@@ -301,12 +263,6 @@
     el.wlEmpty.style.display = 'none';
     
     stocks.forEach(s => {
-      const isUp = s.changePct >= 0;
-      const stroke = isUp ? 'stroke-green' : 'stroke-red';
-      const spark = isUp
-        ? 'M0,20 L20,25 L40,15 L60,18 L80,5 L100,0'
-        : 'M0,5 L20,10 L40,2 L60,15 L80,12 L100,20';
-      
       const alert = alertsMap[s.symbol];
       const level = alert ? alert.level : 'normal';
       const levelLabel = {
@@ -317,34 +273,32 @@
         high: '🔴', watch: '🟡', minor: 'ℹ️', normal: '✓'
       }[level];
 
-      // Calculate since last check diff
-      let sincePct = s.changePct; // default to day change
+      // Since Last Check diff
+      let sincePct = s.changePct;
       const snap = snapshots[s.symbol];
       if (snap && snap.price) {
         sincePct = ((s.ltp - snap.price) / snap.price) * 100;
       }
       const sinceIsUp = sincePct >= 0;
 
-      // Row class for highlighting changed stocks
       let rowClass = '';
       if (level === 'high') rowClass = 'row-attention';
       else if (level === 'watch' || level === 'minor') rowClass = 'row-changed';
 
-      // New badge for changed stocks
-      let newBadge = '';
-      if (alert && Math.abs(sincePct) >= THRESHOLD_MINOR) {
-        newBadge = `<span class="new-badge ${sinceIsUp ? 'up' : 'down'}">${sinceIsUp ? '↑' : '↓'} changed</span>`;
-      }
+      const initials = s.symbol.substring(0, 2);
+      const companyName = s.companyName || s.sector || '';
       
       const tr = document.createElement('tr');
-      tr.className = rowClass;
+      tr.className = rowClass + " clickable-row";
+      tr.dataset.sym = s.symbol;
+      tr.style.cursor = 'pointer';
       tr.innerHTML = `
         <td>
           <div class="sym-col">
-            <div class="sym-icon">${s.symbol.substring(0,2)}</div>
+            <div class="sym-icon">${initials}</div>
             <div>
-              <div class="sym-name">${s.symbol} ${newBadge}</div>
-              <div class="sym-desc">${s.sector}</div>
+              <div class="sym-name">${s.symbol}</div>
+              <div class="sym-desc">${companyName}</div>
             </div>
           </div>
         </td>
@@ -353,14 +307,8 @@
         </td>
         <td class="right">
           <div class="change-pill ${sinceIsUp ? 'up' : 'down'}">
-            <span class="arrow">${sinceIsUp ? '▲' : '▼'}</span>
-            ${sincePct != null ? Math.abs(sincePct).toFixed(1) : '--'}%
+            ${sinceIsUp ? '+' : ''}${sincePct != null ? sincePct.toFixed(1) : '--'}%
           </div>
-        </td>
-        <td class="center">
-          <svg class="trend-sparkline ${stroke}" viewBox="0 0 100 24" preserveAspectRatio="none">
-            <path d="${spark}" fill="none" stroke-width="2"/>
-          </svg>
         </td>
         <td class="center">
           <div class="attention-badge ${badgeClass}">
@@ -376,6 +324,13 @@
           </button>
         </td>
       `;
+      
+      tr.addEventListener('click', (e) => {
+        if (!e.target.closest('.del-btn')) {
+          openStockDetails(s.symbol);
+        }
+      });
+      
       el.wlBody.appendChild(tr);
     });
     
@@ -388,7 +343,7 @@
 
   // ── Main Fetch & Refresh ──
   async function refresh() {
-    if (!watchlist.length) { renderTable([], {}); renderAlerts([]); hideBanner(); return; }
+    if (!watchlist.length) { renderTable([], {}); renderAlerts([]); return; }
     
     try {
       const res = await fetch('/api/quotes', {
@@ -402,7 +357,6 @@
       const alertsMap = {};
       
       currentStocks.forEach(s => {
-        // Only create initial snapshot if one doesn't exist yet
         if (!snapshots[s.symbol]) {
           snapshots[s.symbol] = { price: s.ltp, rsi: s.rsi, ts: Date.now() };
         }
@@ -414,23 +368,147 @@
       });
       Detect.saveSnap();
       
-      // Sort: high > watch > minor
       const levelOrder = { high: 0, watch: 1, minor: 2 };
       alerts.sort((a, b) => (levelOrder[a.level] ?? 3) - (levelOrder[b.level] ?? 3));
       
       renderAlerts(alerts);
       renderTable(currentStocks, alertsMap);
       
-      // Show/update banner if there are changes
-      if (alerts.length > 0) {
-        showBanner(alerts);
-      } else {
-        hideBanner();
-      }
-      
-      el.lblNow.textContent = fmtTime(Date.now());
+      if (el.lblNow) el.lblNow.textContent = fmtTime(Date.now());
       
     } catch (e) { console.error('Refresh error', e); }
+  }
+
+  // ── Stock Details View ──
+  async function openStockDetails(symbol) {
+    try {
+      const res = await fetch(`/api/stock/details/${symbol}`);
+      const data = await res.json();
+      
+      // Update basic header info
+      document.getElementById('sd-logo').textContent = data.symbol.substring(0,2);
+      document.getElementById('sd-symbol').textContent = `${data.symbol} · NSE`;
+      document.getElementById('sd-name').textContent = data.companyName;
+      document.getElementById('sd-ltp').textContent = `₹${data.ltp.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+      
+      const changeEl = document.getElementById('sd-change');
+      changeEl.className = `sd-change ${data.changePct >= 0 ? 'text-green' : 'text-red'}`;
+      changeEl.innerHTML = `${data.changePct >= 0 ? '+' : ''}${data.change.toFixed(2)} (${data.changePct.toFixed(2)}%) <span class="sd-duration">1D</span>`;
+      
+      // Order panel header
+      document.getElementById('op-title').textContent = data.companyName;
+      document.getElementById('op-sub-price').textContent = `NSE ₹${data.ltp.toLocaleString('en-IN', {minimumFractionDigits:2})}`;
+
+      // Market Depth
+      document.getElementById('depth-buy-pct').textContent = data.depth.buyOrdersPct + '%';
+      document.getElementById('depth-sell-pct').textContent = data.depth.sellOrdersPct + '%';
+      document.getElementById('depth-bar-buy').style.width = data.depth.buyOrdersPct + '%';
+      document.getElementById('depth-bar-sell').style.width = data.depth.sellOrdersPct + '%';
+      
+      document.getElementById('depth-bids').innerHTML = data.depth.bids.map(b => `<div class="depth-row buy"><span class="flex-1">${b.price}</span><span class="text-green">${b.qty}</span></div>`).join('');
+      document.getElementById('depth-asks').innerHTML = data.depth.asks.map(a => `<div class="depth-row sell"><span class="flex-1">${a.price}</span><span class="text-red">${a.qty}</span></div>`).join('');
+      document.getElementById('depth-bid-tot').textContent = data.depth.bidTotal;
+      document.getElementById('depth-ask-tot').textContent = data.depth.askTotal;
+
+      // Performance
+      document.getElementById('perf-today-low').textContent = data.performance.todayLow;
+      document.getElementById('perf-today-high').textContent = data.performance.todayHigh;
+      document.getElementById('perf-52-low').textContent = data.performance.week52Low;
+      document.getElementById('perf-52-high').textContent = data.performance.week52High;
+      document.getElementById('perf-open').textContent = data.performance.openPrice;
+      document.getElementById('perf-prev').textContent = data.performance.prevClose;
+      document.getElementById('perf-vol').textContent = data.performance.liveVolume;
+      document.getElementById('perf-lc').textContent = data.performance.lowerCircuit;
+      document.getElementById('perf-uc').textContent = data.performance.upperCircuit;
+
+      // Fundamentals
+      document.getElementById('fund-mcap').textContent = data.fundamentals.marketCap;
+      document.getElementById('fund-roe').textContent = data.fundamentals.roe;
+      document.getElementById('fund-pe').textContent = data.fundamentals.peRatio;
+      document.getElementById('fund-eps').textContent = data.fundamentals.eps;
+      document.getElementById('fund-pb').textContent = data.fundamentals.pbRatio;
+      document.getElementById('fund-div').textContent = data.fundamentals.divYield;
+      document.getElementById('fund-ind-pe').textContent = data.fundamentals.industryPe;
+      document.getElementById('fund-bv').textContent = data.fundamentals.bookValue;
+      document.getElementById('fund-dte').textContent = data.fundamentals.debtToEquity;
+      document.getElementById('fund-fv').textContent = data.fundamentals.faceValue;
+
+      // About
+      document.getElementById('about-desc').innerHTML = data.about.desc + ' <span class="text-green cursor-pointer">...Read more</span>';
+      document.getElementById('about-ceo').textContent = data.about.ceo;
+      document.getElementById('about-founded').textContent = data.about.founded;
+      document.getElementById('about-symbol').textContent = data.about.nseSymbol;
+
+      // Shareholding
+      document.getElementById('sh-bars').innerHTML = `
+        <div class="sh-row"><div class="sh-lbl">Promoters</div><div class="sh-track"><div class="sh-fill fill-prm" style="width:${data.shareholding.promoters}%"></div></div><div class="sh-val">${data.shareholding.promoters}%</div></div>
+        <div class="sh-row"><div class="sh-lbl">FII</div><div class="sh-track"><div class="sh-fill fill-fii" style="width:${data.shareholding.fii}%"></div></div><div class="sh-val">${data.shareholding.fii}%</div></div>
+        <div class="sh-row"><div class="sh-lbl">DII</div><div class="sh-track"><div class="sh-fill fill-dii" style="width:${data.shareholding.dii}%"></div></div><div class="sh-val">${data.shareholding.dii}%</div></div>
+        <div class="sh-row"><div class="sh-lbl">Public</div><div class="sh-track"><div class="sh-fill fill-pub" style="width:${data.shareholding.public}%"></div></div><div class="sh-val">${data.shareholding.public}%</div></div>
+      `;
+
+      // Financials Bar Chart
+      const maxFin = Math.max(...data.financials.yearly.map(f => Math.max(f.rev, f.prof)));
+      document.getElementById('fin-bar-chart').innerHTML = data.financials.yearly.map(f => `
+        <div class="fin-col">
+          <div class="fin-bar bg-slate" style="height: ${(f.rev/maxFin)*100}%"></div>
+          <div class="fin-bar bg-green" style="height: ${(f.prof/maxFin)*100}%"></div>
+          <div class="fin-lbl">${f.year}</div>
+        </div>
+      `).join('');
+
+      // Draw SVG Sparkline Chart
+      const maxPrice = Math.max(...data.chartData);
+      const minPrice = Math.min(...data.chartData);
+      const range = maxPrice - minPrice || 1;
+      let pathD = "";
+      let fillD = "";
+      const step = 800 / (data.chartData.length - 1);
+      
+      data.chartData.forEach((val, i) => {
+        const x = i * step;
+        const y = 300 - (((val - minPrice) / range) * 260 + 20); // leave 20px padding
+        if (i === 0) {
+          pathD += `M ${x},${y} `;
+          fillD += `M ${x},300 L ${x},${y} `;
+        } else {
+          pathD += `L ${x},${y} `;
+          fillD += `L ${x},${y} `;
+        }
+      });
+      fillD += `L 800,300 Z`;
+      
+      const chartPath = document.getElementById('sd-chart-path');
+      const chartFill = document.getElementById('sd-chart-fill');
+      const isNegative = data.changePct < 0;
+      const strokeColor = isNegative ? 'var(--red-primary)' : 'var(--green-primary)';
+      
+      chartPath.setAttribute('d', pathD);
+      chartPath.setAttribute('stroke', strokeColor);
+      
+      chartFill.setAttribute('d', fillD);
+      // update gradient colors
+      const grad = document.getElementById('chartGrad');
+      grad.innerHTML = `
+        <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.8"/>
+        <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+      `;
+
+      // Switch tab visually
+      document.querySelectorAll('.nav-menu .nav-item').forEach(nav => nav.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.getElementById('tab-stock-details').classList.add('active');
+      document.getElementById('tab-stock-details').style.display = 'block';
+
+      // Ensure Overview tab works again when clicked
+      document.querySelector('[data-tab="overview"]').addEventListener('click', () => {
+         document.getElementById('tab-stock-details').style.display = 'none';
+      }, {once: true});
+
+    } catch(e) {
+      console.error("Failed to load stock details", e);
+      toast("Failed to load stock details");
+    }
   }
 
   // ── Search & Dropdown ──
@@ -447,7 +525,7 @@
           <div class="search-item" data-sym="${r.symbol}">
             <div>
               <strong>${r.symbol}</strong>
-              <div style="font-size:0.75rem;color:var(--text-tertiary)">${r.sector}</div>
+              <div style="font-size:0.7rem;color:var(--text-tertiary)">${r.sector}</div>
             </div>
             ${r.ltp ? `<div class="${r.changePct>=0?'text-green':'text-red'}">₹${r.ltp}</div>` : ''}
           </div>
@@ -459,7 +537,10 @@
     el.dropdown.addEventListener('click', e => {
       const item = e.target.closest('.search-item');
       if (item) {
-        WL.add(item.dataset.sym);
+        if (!watchlist.includes(item.dataset.sym)) {
+          WL.add(item.dataset.sym);
+        }
+        openStockDetails(item.dataset.sym);
         el.search.value = '';
         el.dropdown.style.display = 'none';
       }
@@ -470,7 +551,6 @@
     });
   }
 
-  // ── UI Helpers ──
   function toast(msg) {
     const t = document.createElement('div');
     t.className = 'toast';
@@ -484,50 +564,23 @@
     }, TOAST_MS);
   }
 
-  // ── AI Chat Logic ──
+  // ── AI Chat ──
   function setAiState(state) {
-    // states: idle, thinking
     el.aiOrb.className = `ai-orb ${state}`;
     if (state === 'idle') {
       el.orbTitle.textContent = 'Listening...';
       el.orbSub.textContent = 'Ready to help with your watchlist';
-      el.aiChecklist.style.display = 'none';
     } else if (state === 'thinking') {
       el.orbTitle.textContent = 'Thinking...';
       el.orbSub.textContent = 'Analyzing your request';
-      el.aiChecklist.style.display = 'flex';
-      simulateChecklist();
     }
-  }
-
-  function simulateChecklist() {
-    const items = el.aiChecklist.querySelectorAll('.check-item');
-    items.forEach(i => i.querySelector('.check-circle').className = 'check-circle'); // reset
-    
-    let current = 0;
-    const interval = setInterval(() => {
-      if (current > 0 && current <= items.length) {
-        items[current-1].querySelector('.check-circle').className = 'check-circle check-active';
-        items[current-1].querySelector('.check-circle').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
-      }
-      if (current < items.length) {
-        items[current].querySelector('.check-circle').className = 'check-circle check-spin';
-        items[current].querySelector('.check-circle').innerHTML = '';
-      }
-      current++;
-      if (current > items.length) clearInterval(interval);
-    }, 800);
   }
 
   function addMessage(text, isUser = false) {
     const wrapper = document.createElement('div');
     wrapper.className = `msg-wrapper ${isUser ? 'msg-user' : 'msg-ai'}`;
-    
     const formattedText = isUser ? text : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-    
-    wrapper.innerHTML = `
-      <div class="msg-bubble">${formattedText}</div>
-    `;
+    wrapper.innerHTML = `<div class="msg-bubble">${formattedText}</div>`;
     el.chatHistory.appendChild(wrapper);
     el.aiForm.scrollIntoView({ behavior: 'smooth' });
   }
@@ -561,7 +614,7 @@
     }
   });
 
-  // ── Auto-save snapshot on exit ──
+  // ── Auto-save on exit ──
   function autoSaveOnExit() {
     if (currentStocks.length > 0) {
       Detect.saveExitSnapshot(currentStocks);
@@ -576,39 +629,27 @@
     navItems.forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
-        
-        // Remove active class from all
         navItems.forEach(nav => nav.classList.remove('active'));
         tabContents.forEach(tab => tab.classList.remove('active'));
-        
-        // Add active class to clicked item and corresponding tab
         item.classList.add('active');
         const targetTabId = 'tab-' + item.dataset.tab;
         const targetTab = document.getElementById(targetTabId);
-        
-        if (targetTab) {
-          targetTab.classList.add('active');
-        }
+        if (targetTab) targetTab.classList.add('active');
       });
     });
   }
 
   // ── Init ──
   async function init() {
-    WL.init = () => {}; // dummy
     initSearch();
     initTabs();
 
-    // Update greeting dynamically
     const greetingEl = document.querySelector('.greeting');
-    if (greetingEl) {
-      greetingEl.textContent = `${getGreeting()}, Manu`;
-    }
+    if (greetingEl) greetingEl.textContent = `${getGreeting()}, Manu`;
 
-    el.lblLast.textContent = fmtTime(lastVisit);
-    el.lblNow.textContent = fmtTime(Date.now());
+    if (el.lblLast) el.lblLast.textContent = fmtTime(lastVisit);
+    if (el.lblNow) el.lblNow.textContent = fmtTime(Date.now());
 
-    // Mark all seen — both button and banner dismiss
     function markAllSeen() {
       Detect.markSeen(currentStocks);
       renderAlerts([]);
@@ -616,28 +657,22 @@
       toast('All changes marked as seen');
     }
 
-    el.btnSeen.addEventListener('click', markAllSeen);
-    el.bannerDismiss.addEventListener('click', markAllSeen);
+    if (el.btnSeen) el.btnSeen.addEventListener('click', markAllSeen);
 
     await refresh();
 
-    // Polling
     setInterval(async () => {
       if (!document.hidden) await refresh();
     }, POLL);
 
-    // Auto-save on tab switch
     document.addEventListener('visibilitychange', async () => {
       if (document.hidden) {
-        // User is leaving — save current prices as snapshot
         autoSaveOnExit();
       } else {
-        // User is back — refresh and show changes
         await refresh();
       }
     });
 
-    // Auto-save when closing browser/tab
     window.addEventListener('beforeunload', () => {
       autoSaveOnExit();
     });

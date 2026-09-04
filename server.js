@@ -378,6 +378,140 @@ Rules:
   }
 });
 
+// ── Detailed Stock View (Deterministic Mock Data) ──
+app.get('/api/stock/details/:symbol', (req, res) => {
+  const sym = req.params.symbol.toUpperCase();
+  
+  // Use a simple hash of the symbol name to generate stable, deterministic mock data
+  const hash = Array.from(sym).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  
+  // Try to get real basic info if available
+  let basePrice = 1000 + (hash * 10 % 2000);
+  let changePct = ((hash % 100) / 20) - 2.5; // -2.5% to +2.5%
+  let sector = SECTOR_LOOKUP[sym] || 'Unknown';
+  let companyName = sym + ' Inc.';
+
+  if (latestMarketData) {
+    const live = latestMarketData.allStocks.find(s => s.symbol === sym);
+    if (live) {
+      basePrice = live.ltp;
+      changePct = live.changePct;
+      sector = live.sector;
+    }
+  }
+
+  const change = (basePrice * (changePct / 100));
+  const prevClose = basePrice - change;
+  const isUp = changePct >= 0;
+
+  // Market Depth
+  const buyPct = 40 + (hash % 20);
+  const sellPct = 100 - buyPct;
+  const depth = {
+    buyOrdersPct: buyPct.toFixed(2),
+    sellOrdersPct: sellPct.toFixed(2),
+    bids: [
+      { price: (basePrice - 0.1).toFixed(2), qty: 23 },
+      { price: (basePrice - 0.3).toFixed(2), qty: 24 },
+      { price: (basePrice - 0.4).toFixed(2), qty: 39 },
+      { price: (basePrice - 0.5).toFixed(2), qty: 56 },
+      { price: (basePrice - 0.6).toFixed(2), qty: 328 }
+    ],
+    asks: [
+      { price: (basePrice + 0.1).toFixed(2), qty: 22 },
+      { price: (basePrice + 0.3).toFixed(2), qty: 6 },
+      { price: (basePrice + 0.4).toFixed(2), qty: 2 },
+      { price: (basePrice + 0.5).toFixed(2), qty: 3 },
+      { price: (basePrice + 0.6).toFixed(2), qty: 21 }
+    ],
+    bidTotal: "72,434",
+    askTotal: "92,504"
+  };
+
+  // Performance
+  const todayLow = basePrice * (1 - ((hash%3)/100 + 0.01));
+  const todayHigh = basePrice * (1 + ((hash%3)/100 + 0.01));
+  const week52Low = basePrice * 0.7;
+  const week52High = basePrice * 1.4;
+  const performance = {
+    todayLow: todayLow.toFixed(2),
+    todayHigh: todayHigh.toFixed(2),
+    week52Low: week52Low.toFixed(2),
+    week52High: week52High.toFixed(2),
+    openPrice: (basePrice - change + ((hash%10)/100)).toFixed(2),
+    prevClose: prevClose.toFixed(2),
+    liveVolume: (hash * 1234).toLocaleString(),
+    lowerCircuit: (basePrice * 0.9).toFixed(2),
+    upperCircuit: (basePrice * 1.1).toFixed(2)
+  };
+
+  // Fundamentals
+  const fundamentals = {
+    marketCap: "₹" + (hash * 123).toLocaleString() + "Cr",
+    roe: (15 + (hash%15)).toFixed(2) + "%",
+    peRatio: (10 + (hash%20)).toFixed(2),
+    eps: (hash % 300).toFixed(2),
+    pbRatio: ((hash % 10) / 2 + 1).toFixed(2),
+    divYield: ((hash % 3) + 0.5).toFixed(2) + "%",
+    industryPe: (15 + (hash%10)).toFixed(2),
+    bookValue: (hash * 2.5).toFixed(2),
+    debtToEquity: ((hash % 5) / 10).toFixed(2),
+    faceValue: 10
+  };
+
+  // Financial Performance (Mock bar chart data)
+  const financials = {
+    yearly: [
+      { year: "'22", rev: 5000 + hash, prof: 1000 + (hash/2) },
+      { year: "'23", rev: 6000 + hash, prof: 1500 + (hash/2) },
+      { year: "'24", rev: 7500 + hash, prof: 2000 + (hash/2) },
+      { year: "'25", rev: 8000 + hash, prof: 1800 + (hash/2) },
+      { year: "'26", rev: 8695 + hash, prof: 2825 + (hash/2) }
+    ]
+  };
+
+  // Shareholding
+  const shareholding = {
+    promoters: (40 + (hash%30)).toFixed(2),
+    fii: (10 + (hash%15)).toFixed(2),
+    dii: (5 + (hash%10)).toFixed(2),
+    public: (20 + (hash%10)).toFixed(2)
+  };
+
+  // About
+  const about = {
+    desc: `Established in 1997, ${companyName} is one of India's largest companies in the ${sector} sector with a rich legacy. The company's vision is to become the most trusted, globally diversified institution.`,
+    ceo: "John Doe",
+    founded: "1997",
+    nseSymbol: sym
+  };
+
+  // Mock historical chart data (100 points for a nice sparkline)
+  const chartData = [];
+  let cp = prevClose;
+  for (let i=0; i<100; i++) {
+    cp = cp * (1 + (Math.random() - 0.48) * 0.01);
+    chartData.push(cp);
+  }
+  chartData[chartData.length - 1] = basePrice; // end exactly at current price
+
+  res.json({
+    symbol: sym,
+    companyName,
+    sector,
+    ltp: basePrice,
+    changePct,
+    change,
+    depth,
+    performance,
+    fundamentals,
+    financials,
+    shareholding,
+    about,
+    chartData
+  });
+});
+
 // ── Start ──
 app.listen(PORT, () => {
   console.log(`\n🚀 Smart Watchlist → http://localhost:${PORT}\n`);
