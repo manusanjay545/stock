@@ -489,13 +489,9 @@
         high: '🔴', watch: '🟡', minor: 'ℹ️', normal: '✓'
       }[level];
 
-      // Since Last Check diff
-      let sincePct = s.changePct;
-      const snap = snapshots[s.symbol];
-      if (snap && snap.price) {
-        sincePct = ((s.ltp - snap.price) / snap.price) * 100;
-      }
-      const sinceIsUp = sincePct >= 0;
+      // Today Change
+      const todayPct = s.changePct;
+      const todayIsUp = todayPct >= 0;
 
       let rowClass = '';
       if (level === 'high') rowClass = 'row-attention';
@@ -522,8 +518,8 @@
           <div class="val-price">₹${s.ltp ? s.ltp.toLocaleString('en-IN') : '--'}</div>
         </td>
         <td class="right">
-          <div class="change-pill ${sinceIsUp ? 'up' : 'down'}">
-            ${sinceIsUp ? '+' : ''}${sincePct != null ? sincePct.toFixed(1) : '--'}%
+          <div class="change-pill ${todayIsUp ? 'up' : 'down'}">
+            ${todayIsUp ? '+' : ''}${todayPct != null ? todayPct.toFixed(2) : '--'}%
           </div>
         </td>
         <td class="center">

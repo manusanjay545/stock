@@ -170,34 +170,6 @@
             </div>
           </section>
 
-          <!-- Row 4: Watchlist Table -->
-          <section class="watchlist-section">
-            <div class="section-header">
-              <h2>Your Watchlist</h2>
-              <button class="btn-text" id="btn-mark-seen">Mark all seen</button>
-            </div>
-            <div class="table-container">
-              <table class="wl-table">
-                <thead>
-                  <tr>
-                    <th>Symbol</th>
-                    <th class="right">Price</th>
-                    <th class="right">Since Last Check</th>
-                    <th class="center">Attention</th>
-                    <th class="right">Last Updated</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="wl-tbody">
-                  <!-- Populated by JS -->
-                </tbody>
-              </table>
-              <div id="wl-empty" class="empty-state" style="display:none">
-                <div class="empty-icon">📋</div>
-                <h3>Your watchlist is empty</h3>
-                <p>Search for stocks above to start tracking them.</p>
-              </div>
-            </div>
           </section>
 
           <!-- Row 4: Bottom Widgets -->
@@ -263,11 +235,31 @@
         <div id="tab-watchlist" class="tab-content">
           <h1>Watchlist</h1>
           <p class="subtitle">Manage and track all your stocks in one place.</p>
-          <div class="placeholder-card">
-            <div class="placeholder-icon">⭐</div>
-            <h3>Switch to Overview for real-time tracking</h3>
-            <p>Your live watchlist with change detection is displayed on the Overview tab.</p>
-          </div>
+          
+          <section class="watchlist-section" style="margin-top: 24px;">
+            <div class="table-container">
+              <table class="wl-table">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th class="right">Price</th>
+                    <th class="right">Today Change</th>
+                    <th class="center">Attention</th>
+                    <th class="right">Last Updated</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="wl-tbody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+              <div id="wl-empty" class="empty-state" style="display:none">
+                <div class="empty-icon">📋</div>
+                <h3>Your watchlist is empty</h3>
+                <p>Search for stocks above to start tracking them.</p>
+              </div>
+            </div>
+          </section>
         </div>
 
         <!-- ── TAB: STOCK DETAILS (Groww Clone) ── -->
